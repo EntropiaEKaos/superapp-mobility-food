@@ -111,6 +111,27 @@ export async function sandboxOperationsSnapshot() {
       select: { createdAt: true },
     }),
   ]);
+  const [deadSamples, lastPublished, workerStats] = await Promise.all([
+    db().sandboxEventOutbox.findMany({
+      where: { status: 'DEAD' }, orderBy: { createdAt: 'asc' }, take: 5,
+      select: { id: true, attempts: true, lastErrorCode: true, createdAt: true },
+    }),
+    db().sandboxEventOutbox.findMany({
+      where: { status: 'PUBLISHED', publishedAt: { not: null } },
+      orderBy: { publishedAt: 'desc' }, take: 50,
+      select: { createdAt: true, publishedAt: true },
+    }),
+    db().$queryRaw<Array<{ active: number }>>`
+      SELECT COUNT(*)::int AS active FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND application_name = 'superapp-sandbox-outbox-worker'
+    `,
+  ]);
+  const averagePublishLagSeconds = lastPublished.length
+    ? Math.round(lastPublished.reduce((sum, row) =>
+        sum + Math.max(0, (row.publishedAt!.getTime() - row.createdAt.getTime()) / 1000), 0
+      ) / lastPublished.length)
+    : null;
   const outboxHealth = {
     pending: pendingOutbox,
     published: publishedOutbox,
@@ -134,6 +155,8 @@ export async function sandboxOperationsSnapshot() {
     generatedAt: now.toISOString(),
     streamHealth,
     outboxHealth,
+    deadSamples: deadSamples.map(row => ({ ...row, id: row.id.toString() })),
+    workerHealth: { activeConnections: workerStats[0]?.active ?? 0, averagePublishLagSeconds, sampleSize: lastPublished.length },
     recentLimit: 20,
     metrics: {
       ridesByStatus: counts,
