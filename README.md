@@ -37,20 +37,15 @@ npm run check
 npm run build
 ```
 
-## GitHub — publicar no repositório público já criado
+## GitHub — repositório oficial
 
-O repositório é público. Certifique-se de não enviar credenciais, arquivos `.env`, tokens, dados pessoais reais ou segredos. Para publicar manualmente, dentro da pasta:
+O repositório oficial é [EntropiaEKaos/superapp-mobility-food](https://github.com/EntropiaEKaos/superapp-mobility-food). O código da Sprint 01 já está na branch `main`; propostas novas entram por Pull Request com CI. Nunca envie credenciais, arquivos `.env`, tokens ou dados reais.\n\nExecute `npm install` antes de fazer o primeiro commit para gerar `package-lock.json` e incluí-lo no Git. Enquanto não existir lockfile, o CI faz `npm install`; quando existir, faz `npm ci` para builds reproduzíveis. **Sem acesso ao registro npm neste ambiente, o lockfile e as migrações ainda não foram gerados; são passos obrigatórios antes da produção.**
 
-```bash
-git init
-git add .
-git commit -m "feat: bootstrap superapp sprint 01"
-git branch -M main
-git remote add origin https://github.com/EntropiaEKaos/superapp-mobility-food.git
-git push -u origin main
-```
+## Sprint 02 — demonstração interativa
 
-Execute `npm install` antes de fazer o primeiro commit para gerar `package-lock.json` e incluí-lo no Git. Enquanto não existir lockfile, o CI faz `npm install`; quando existir, faz `npm ci` para builds reproduzíveis. **Sem acesso ao registro npm neste ambiente, o lockfile e as migrações ainda não foram gerados; são passos obrigatórios antes da produção.**
+- Cardápio com controles de quantidade, carrinho local e subtotal. Sem envio de pedidos ou pagamentos.
+- `node scripts/smoke.mjs` verifica a home, catálogo, cardápio, estimativa, validação de entrada e bloqueio da autenticação no modo demo.
+- Manual de primeiro preview em [`docs/VERCEL_PREVIEW.md`](docs/VERCEL_PREVIEW.md).
 
 ## Vercel
 
