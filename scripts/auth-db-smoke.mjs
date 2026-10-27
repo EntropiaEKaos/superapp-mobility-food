@@ -474,7 +474,10 @@ try {
       controller.abort();
       return { response, controller: null };
     }
-    sockets.push(controller);
+    const reader = response.body.getReader();
+    const firstPacket = await reader.read();
+    assert.equal(firstPacket.done, false, 'each admitted SSE must send initial data');
+    sockets.push({ controller, reader });
     return { response, controller };
   }
   try {
@@ -522,7 +525,8 @@ try {
     assert.equal(ninth.response.status, 429, 'ninth admin cannot consume a ninth DB connection');
     assert.equal((await ninth.response.json()).code, 'capacity_reached');
 
-    sockets[0].abort();
+    await sockets[0].reader.cancel();
+    sockets[0].controller.abort();
     for (let i = 0; i < 40; i++) {
       const state = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
       const data = await state.json();
@@ -536,7 +540,10 @@ try {
     assert.equal(finalState.streamHealth.activeConnections, 8, 'all eight stream slots reused safely');
     assert.equal(finalState.streamHealth.availableSlots, 0);
   } finally {
-    for (const socket of sockets) socket.abort();
+    for (const socket of sockets) {
+      await socket.reader.cancel().catch(() => undefined);
+      socket.controller.abort();
+    }
   }
   const finalOperations = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
   assert.equal(finalOperations.status, 200);
