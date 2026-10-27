@@ -322,3 +322,25 @@ model SandboxRideEvent {
   @@unique([rideId, sequence])
   @@index([rideId, createdAt])
 }
+
+/**
+ * Sprint 13: database-backed notification outbox for fictitious sandbox changes.
+ * Not a payment ledger or a durable replay protocol for connected clients.
+ */
+enum SandboxOutboxStatus {
+  PENDING
+  PUBLISHED
+}
+
+model SandboxEventOutbox {
+  id          BigInt             @id @default(autoincrement())
+  status      SandboxOutboxStatus @default(PENDING)
+  sourceTable String
+  operation   String
+  attempts    Int                @default(0)
+  createdAt   DateTime           @default(now())
+  publishedAt DateTime?
+
+  @@index([status, id])
+  @@index([createdAt])
+}
