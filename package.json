@@ -24,13 +24,15 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "sandbox:bridge": "node scripts/sandbox-redis-bridge.mjs",
     "sandbox:benchmark": "node scripts/outbox-benchmark-smoke.mjs",
-    "sandbox:circuit-test": "node scripts/broker-circuit-smoke.mjs"
+    "sandbox:circuit-test": "node scripts/broker-circuit-smoke.mjs",
+    "test:visual": "node scripts/visual-browser-smoke.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0",
     "pg": "^8.16.0",
-    "redis": "^5.0.0"
+    "redis": "^5.0.0",
+    "playwright": "^1.56.1"
   }
 }
