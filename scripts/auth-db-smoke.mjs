@@ -315,7 +315,55 @@ try {
   assert.equal(productionRides.rows[0].count, 0);
   const sandboxPage = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
   assert.equal(sandboxPage.status, 200);
-  assert.match(await sandboxPage.text(), /Corridas simuladas com ofertas/);
+  assert.match(await sandboxPage.text(), /Central de operações simuladas/);
+  // Sprint 08: global aggregates and bounded activity list must agree with the database.
+  const opsResponse = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(opsResponse.status, 200);
+  const ops = await opsResponse.json();
+  assert.equal(ops.demo, true);
+  assert.ok(ops.generatedAt);
+  assert.equal(ops.recentLimit, 20);
+  const allRides = await pool.query('SELECT COUNT(*)::int AS total FROM "SandboxRide"');
+  assert.equal(ops.metrics.totalRides, allRides.rows[0].total);
+  assert.equal(ops.metrics.totalRides,
+    Object.values(ops.metrics.ridesByStatus).reduce((a, b) => a + b, 0));
+  assert.equal(ops.metrics.completedRides, 1);
+  assert.equal(ops.metrics.activeRides, 0);
+  assert.equal(ops.metrics.eventCount,
+    Number((await pool.query('SELECT COUNT(*)::int AS total FROM "SandboxRideEvent"')).rows[0].total));
+  assert.ok(ops.recentEvents.some(event => event.type === 'COMPLETED'));
+  assert.ok(ops.recentEvents.length <= 12);
+  assert.equal(ops.metrics.totalDrivers, 3);
+  assert.ok(Array.isArray(ops.diagnostics));
+
+  // A pending offer past its deadline must appear in the diagnostic read model.
+  const overdueCreation = await sandboxCall(adminCookie, { action: 'create', origin: 'boqueirao', destination: 'caicara' });
+  assert.equal(overdueCreation.status, 200);
+  const overdueRideId = (await overdueCreation.json()).result.id;
+  assert.equal((await sandboxCall(adminCookie, { action: 'offer', rideId: overdueRideId })).status, 200);
+  await pool.query('UPDATE "SandboxRideOffer" SET "expiresAt" = NOW() - INTERVAL \'2 minutes\' WHERE "rideId" = $1', [overdueRideId]);
+  const flagged = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(flagged.status, 200);
+  const flaggedSnapshot = await flagged.json();
+  assert.equal(flaggedSnapshot.metrics.overdueOffers, 2);
+  assert.ok(flaggedSnapshot.diagnostics.some(item =>
+    item.rideId === overdueRideId && item.code === 'OVERDUE_OFFER'));
+  assert.equal((await sandboxCall(adminCookie, { action: 'expire', rideId: overdueRideId })).status, 200);
+  const afterExpiry = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(afterExpiry.status, 200);
+  const cleanOps = await afterExpiry.json();
+  assert.equal(cleanOps.metrics.overdueOffers, 0);
+  assert.ok(!cleanOps.diagnostics.some(item => item.code === 'OVERDUE_OFFER'));
+  assert.equal(cleanOps.metrics.ridesByStatus.EXPIRED, 2);
+  assert.equal(cleanOps.metrics.ridesByStatus.COMPLETED, 1);
+
+  const operationsPage = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(operationsPage.status, 200);
+  const operationsHtml = await operationsPage.text();
+  assert.match(operationsHtml, /Visão geral da operação/);
+  assert.match(operationsHtml, /Diagnóstico de integridade/);
+  assert.match(operationsHtml, /Eventos recentes/);
+
 
   console.log('PASS: auth, sandbox ride lifecycle, 10 simulated positions, sequential event log, concurrency, expiry and cancel.');
 } catch (error) {

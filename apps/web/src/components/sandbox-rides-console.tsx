@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CarFront, Clock3, CircleCheck, CircleX, RotateCw } from 'lucide-react';
+import { SandboxOperationsOverview, type SandboxOpsTelemetry } from './sandbox-operations-overview';
 
 type Offer = {
   id: string;
@@ -22,7 +23,7 @@ type Ride = {
   offers: Offer[];
 };
 type Driver = { id: string; label: string; busy: boolean; active: boolean; lastSeenAt: string };
-export type SandboxSnapshot = { demo: true; drivers: Driver[]; rides: Ride[] };
+export type SandboxSnapshot = { demo: true; drivers: Driver[]; rides: Ride[] } & SandboxOpsTelemetry;
 
 export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
   const [snapshot, setSnapshot] = useState(initial);
@@ -31,6 +32,8 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [filter, setFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
 
   async function refresh() {
     const response = await fetch('/api/admin/sandbox-rides', { cache: 'no-store' });
@@ -57,6 +60,21 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
     }
   }
 
+  async function updateManually() {
+    if (working) return;
+    setWorking(true);
+    setError('');
+    try { await refresh(); } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Falha ao atualizar a leitura.');
+    } finally { setWorking(false); }
+  }
+
+  const filteredRides = snapshot.rides.filter(ride =>
+    (filter === 'ALL' || ride.status === filter) &&
+    [ride.id, ride.pickupLabel, ride.dropoffLabel, ride.acceptedDriver?.label ?? '']
+      .some(text => text.toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR')))
+  );
+
   const labels: Record<Ride['status'], string> = {
     REQUESTED: 'Criada', OFFERED: 'Ofertas enviadas', ACCEPTED: 'Aceita',
     ARRIVING: 'Motorista a caminho', IN_PROGRESS: 'Viagem em andamento',
@@ -67,6 +85,7 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
     ['ocian', 'Ocian'], ['caicara', 'Caiçara'],
   ];
   return <div className="sandbox-lab">
+    <SandboxOperationsOverview snapshot={snapshot} onRefresh={() => { void updateManually(); }} refreshing={working}/>
     <section className="panel">
       <h2><CarFront size={22}/> Laboratório de ofertas</h2>
       <p className="partner-muted">Dados fictícios em PostgreSQL. Não conecta passageiros, motoristas ou pagamentos reais.</p>
@@ -96,9 +115,21 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
       <div><span>Corridas no laboratório</span><strong>{snapshot.rides.length}</strong></div>
     </section>
     <section className="panel">
-      <h2>Corridas de teste</h2>
+      <div className="ops-ride-filters">
+        <div><h2>Corridas de teste</h2><p>Exibindo {filteredRides.length} das {snapshot.rides.length} viagens mais recentes ({snapshot.recentLimit} no máximo).</p></div>
+        <label>Estado
+          <select value={filter} onChange={event => setFilter(event.target.value)}>
+            <option value="ALL">Todos os estados</option>
+            {Object.entries(labels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
+        <label>Buscar
+          <input type="search" value={search} onChange={event => setSearch(event.target.value)}
+            placeholder="Bairro, motorista ou ID" aria-label="Buscar corridas fictícias" />
+        </label>
+      </div>
       <div className="review-list">
-        {snapshot.rides.map(ride => <article className="review-entry" key={ride.id}>
+        {filteredRides.map(ride => <article className="review-entry" key={ride.id}>
           <div className="review-heading"><div>
             <span className="tag">{labels[ride.status]}</span>
             <h3>{ride.pickupLabel} → {ride.dropoffLabel}</h3>
@@ -156,7 +187,7 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
             </div>)}
           </div>}
         </article>)}
-        {snapshot.rides.length === 0 && <p className="partner-muted">Prepare os veículos e crie uma corrida fictícia para começar.</p>}
+        {filteredRides.length === 0 && <p className="partner-muted">Nenhuma corrida encontrada. Altere os filtros ou crie uma simulação.</p>}
       </div>
       <div className="sandbox-reset">
         <button className="btn secondary" disabled={working}

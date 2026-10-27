@@ -82,3 +82,46 @@
 .sandbox-timeline li{border-left:3px solid #8abd55;padding:3px 0 3px 13px;display:flex;flex-direction:column;gap:5px}
 .sandbox-timeline li strong{font-size:12px}
 .sandbox-timeline li span{font-size:11px;color:#b8c9b7}
+
+/* Sprint 08 · operational analytics dashboard, no glass overlays */
+.ops-overview{display:grid;gap:20px;padding-bottom:4px}
+.ops-toolbar{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.ops-toolbar h2{font-size:clamp(25px,3vw,34px);letter-spacing:-1.2px;margin:10px 0 8px}
+.ops-toolbar p,.ops-help{font-size:12px;line-height:1.7;color:#9faf9f}
+.ops-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.ops-kpi{border:1px solid #385242;background:#16251c;border-radius:17px;padding:20px;display:grid;gap:12px;min-height:134px}
+.ops-kpi>span:not(.ops-kpi-icon){color:#b3c6b4;font-size:13px}
+.ops-kpi strong{font-size:35px;color:#eaffd7;letter-spacing:-1.3px}
+.ops-kpi-icon{color:var(--lime)}
+.ops-substats{border:1px solid #354b3a;background:#0e1e15;border-radius:12px;padding:13px 18px;display:flex;flex-wrap:wrap;column-gap:24px;row-gap:10px;color:#bacbb7;font-size:12px}
+.ops-substats b{color:var(--lime)}
+.ops-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.ops-columns .panel{min-width:0}
+.ops-columns h3,.ops-activity h3{margin:0;font-size:20px}
+.ops-status-bars{display:grid;gap:14px;margin:23px 0 4px}
+.ops-status-row{display:grid;grid-template-columns:108px minmax(0,1fr) 30px;align-items:center;gap:14px}
+.ops-status-row span{color:#c7d8c6;font-size:12px}
+.ops-status-row strong{text-align:right;font-size:13px}
+.ops-track{height:10px;border-radius:99px;overflow:hidden;background:#354c37}
+.ops-track>div{height:100%;background:var(--lime);border-radius:99px;transition:width .2s ease}
+.ops-healthy{display:flex;gap:10px;align-items:center;color:#cdebad;font-size:13px;line-height:1.5;margin-top:24px}
+.ops-issues{list-style:none;padding:0;display:grid;gap:11px}
+.ops-issues li,.ops-alert{display:flex;align-items:start;gap:10px;border-radius:11px;padding:12px;background:#422d22;border:1px solid #785238;color:#ffd6ad;font-size:12px;line-height:1.6}
+.ops-issues li svg,.ops-alert svg{flex-shrink:0;margin-top:2px}
+.ops-issues small{display:block;color:#eab491}
+.ops-activity-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.ops-activity-heading span{font-size:12px;color:#a5b7a3}
+.ops-activity ol{list-style:none;padding:0;margin:0;display:grid}
+.ops-activity li{border-top:1px solid #35483b;padding:14px 0;display:flex;align-items:start;gap:13px}
+.ops-event-mark{display:grid;place-items:center;flex-shrink:0;height:34px;width:34px;background:#29412b;color:var(--lime);border-radius:10px}
+.ops-event-detail{display:grid;gap:5px;min-width:0;flex:1}
+.ops-event-detail strong{font-size:13px}
+.ops-event-detail span,.ops-event-detail small{font-size:11px;color:#b2c3b2;overflow-wrap:anywhere}
+.ops-activity time{font-size:11px;color:#abc1aa;white-space:nowrap}
+.ops-ride-filters{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:16px;margin-bottom:20px}
+.ops-ride-filters h2{margin:0 0 4px}
+.ops-ride-filters p{font-size:12px;color:#acbdad;margin:0}
+.ops-ride-filters label{font-size:11px;display:grid;gap:6px;color:#c8d9c5;font-weight:800}
+.ops-ride-filters select,.ops-ride-filters input{background:#102016;color:#f1faef;padding:11px 13px;border:1px solid #557055;border-radius:10px;max-width:230px}
+@media(max-width:850px){.ops-columns{grid-template-columns:1fr}}
+@media(max-width:650px){.ops-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-kpi{padding:16px}.ops-kpi strong{font-size:28px}.ops-activity li{flex-wrap:wrap}.ops-activity time{width:100%;padding-left:47px}.ops-ride-filters{align-items:stretch}.ops-ride-filters label{flex:1}.ops-ride-filters select,.ops-ride-filters input{max-width:none;width:100%}}
