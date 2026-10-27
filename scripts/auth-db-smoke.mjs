@@ -471,7 +471,8 @@ try {
       headers: { Cookie: cookie }, signal: controller.signal,
     });
     if (response.status !== 200) {
-      controller.abort();
+      // An HTTP 429 is a finite JSON response: let callers inspect it
+      // before discarding the request. Aborting first breaks response.json().
       return { response, controller: null };
     }
     const reader = response.body.getReader();
