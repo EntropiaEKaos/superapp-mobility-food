@@ -73,6 +73,16 @@ try {
   });
   assert.equal(bad.status, 422, 'invalid geographic coordinates must be rejected');
 
+  const dispatchDemo = await response('/rides/dispatch-demo');
+  assert.equal(dispatchDemo.status, 200, 'dispatch prototype page must render');
+  const dispatchHtml = await dispatchDemo.text();
+  assert.match(dispatchHtml, /Quem receberia a corrida/);
+  assert.match(dispatchHtml, /Carro Alpha/);
+  assert.doesNotMatch(dispatchHtml, /Carro Charlie \(ocupado\)/, 'busy driver is ineligible');
+
+  const protectedReview = await response('/api/admin/partner-applications');
+  assert.equal(protectedReview.status, 503, 'admin API must stay disabled in no-database demo');
+
   const auth = await response('/api/auth/get-session');
   assert.equal(auth.status, 503, 'demo without credentials must not expose a live auth endpoint');
 
