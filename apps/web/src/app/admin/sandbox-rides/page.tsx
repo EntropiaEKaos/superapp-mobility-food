@@ -20,9 +20,9 @@ export default async function SandboxRidesPage() {
   return <main className="wrap interior">
     <Link className="back" href="/admin"><ArrowLeft size={16}/> Administração</Link>
     <div className="page-heading">
-      <div className="eyebrow muted">SPRINT 08 · CENTRAL DE OPERAÇÕES</div>
+      <div className="eyebrow muted">SPRINT 09 · CENTRAL DE OPERAÇÕES</div>
       <h1>Central de operações simuladas</h1>
-      <p>Acompanhe corridas fictícias, indicadores globais, eventos recentes e diagnósticos do laboratório. Sem corridas ou GPS reais.</p>
+      <p>Acompanhe corridas fictícias com atualização automática a cada 6 segundos, indicadores, eventos e trajeto ilustrativo. Sem corridas ou GPS reais.</p>
     </div>
     {!sandboxEnabled() ? <div className="notice"><ShieldCheck size={17}/> Recurso desligado por padrão. Use ENABLE_SANDBOX_DISPATCH=true apenas no ambiente isolado de desenvolvimento.</div>
       : <SandboxRidesConsole initial={JSON.parse(JSON.stringify(await sandboxOperationsSnapshot()))}/>}
