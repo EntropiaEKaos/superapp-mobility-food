@@ -1,6 +1,7 @@
 import { db } from '@superapp/database';
 import { sandboxSnapshot } from './sandbox-dispatch';
 import { getSandboxStreamHealth } from './sandbox-stream-capacity';
+import { getRedisSandboxStreamHealth } from './sandbox-redis-transport';
 
 export const SANDBOX_RIDE_STATUSES = [
   'REQUESTED', 'OFFERED', 'ACCEPTED', 'ARRIVING',
@@ -94,7 +95,9 @@ export async function sandboxOperationsSnapshot() {
     ]),
   ) as Record<SandboxStatus, number>;
   const totalRides = Object.values(counts).reduce((sum, quantity) => sum + quantity, 0);
-  const streamHealth = await getSandboxStreamHealth();
+  const streamHealth = process.env.SANDBOX_EVENT_TRANSPORT === 'redis'
+    ? await getRedisSandboxStreamHealth()
+    : { ...(await getSandboxStreamHealth()), transport: 'postgres' as const };
 
   return {
     ...snapshot,
