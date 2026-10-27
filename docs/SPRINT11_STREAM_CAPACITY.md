@@ -30,10 +30,12 @@ O navegador permanece capaz de recorrer a GET a cada 6 segundos (com backoff em 
 
 No PostgreSQL 16 isolado do CI:
 1. Uma conta ADMIN abre um stream, e uma segunda conexão da **mesma conta** recebe `429 user_busy`.
-2. O teste cria **sete administradores fictícios adicionais**; todos conseguem abrir suas próprias conexões, chegando ao limite de oito.
-3. O nono administrador recebe `429 capacity_reached`, sem obter conexão SSE.
-4. A desconexão de um operador libera a vaga; outro consegue utilizar a capacidade recuperada.
+2. Uma segunda sessão autenticada, promovida a ADMIN exclusivamente no banco efêmero do CI, consegue transmitir em paralelo.
+3. O teste encerra essas duas conexões e simula **oito processos/instâncias externos** detendo locks de sessão do PostgreSQL. Uma nova solicitação ADMIN recebe `429 capacity_reached`, sem obter conexão SSE.
+4. Uma instância externa libera sua vaga; uma conexão HTTP autenticada a utiliza sem conflito.
 5. Os indicadores mostram oito conexões ativas, zero vagas restantes, e o painel administrativo renderiza o medidor.
+
+Os clientes extras simulam **conexões de banco concorrentes**, não oito identidades humanas logadas. Os testes não desativam nem contornam o limite antiabuso do cadastro público.
 
 ## Limitações e próxima infraestrutura
 
