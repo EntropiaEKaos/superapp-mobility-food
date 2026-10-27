@@ -8,8 +8,11 @@ import pg from 'pg';
  * Isolated HTTP + PostgreSQL homologation journey. Not a real-money or GPS test.
  * Safe on ephemeral GitHub Actions CI only. Never points at a shared DB.
  */
-if (process.env.CI !== 'true' || !process.env.DATABASE_URL?.includes('/superapp_ci')) {
-  throw new Error('Homologation requires CI=true and an ephemeral superapp_ci database');
+const testDatabase = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null;
+if (process.env.CI !== 'true' ||
+    testDatabase?.pathname !== '/superapp_ci' ||
+    !['localhost', '127.0.0.1', '[::1]'].includes(testDatabase.hostname)) {
+  throw new Error('Homologation requires CI=true and a local, ephemeral superapp_ci database');
 }
 const port = 3191;
 const origin = 'http://127.0.0.1:' + port;
