@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  COURIER
+  RESTAURANT_OWNER
+  ADMIN
+}
+
+enum RideStatus {
+  REQUESTED
+  OFFERED
+  ACCEPTED
+  ARRIVING
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum FoodOrderStatus {
+  CREATED
+  ACCEPTED
+  PREPARING
+  READY
+  PICKED_UP
+  DELIVERED
+  CANCELED
+}
+
+// Better Auth default models. Changing these fields requires aligning adapter config.
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  role          UserRole @default(CUSTOMER)
+  sessions      Session[]
+  accounts      Account[]
+  ridesAsRider  Ride[]   @relation("RideRider")
+  ridesAsDriver Ride[]   @relation("RideDriver")
+  restaurants   Restaurant[]
+  foodOrders    FoodOrder[]
+  vehicles      Vehicle[]
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String   @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([identifier])
+  @@map("verifications")
+}
+
+model Vehicle {
+  id         String   @id @default(cuid())
+  driverId   String
+  driver     User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  plate      String   @unique
+  model      String
+  category   String
+  approved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  @@index([driverId])
+}
+
+model Ride {
+  id          String     @id @default(cuid())
+  riderId     String
+  rider       User       @relation("RideRider", fields: [riderId], references: [id])
+  driverId    String?
+  driver      User?      @relation("RideDriver", fields: [driverId], references: [id])
+  status      RideStatus @default(REQUESTED)
+  pickupLabel String
+  dropoffLabel String
+  pickupLat   Decimal    @db.Decimal(10, 7)
+  pickupLng   Decimal    @db.Decimal(10, 7)
+  dropoffLat  Decimal    @db.Decimal(10, 7)
+  dropoffLng  Decimal    @db.Decimal(10, 7)
+  quoteCents  Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  @@index([status, createdAt])
+  @@index([riderId, createdAt])
+  @@index([driverId, status])
+}
+
+model Restaurant {
+  id         String       @id @default(cuid())
+  ownerId    String
+  owner      User         @relation(fields: [ownerId], references: [id])
+  name       String
+  slug       String       @unique
+  active     Boolean      @default(false)
+  address    String
+  createdAt  DateTime     @default(now())
+  menuItems  MenuItem[]
+  foodOrders FoodOrder[]
+  @@index([ownerId])
+}
+
+model MenuItem {
+  id           String      @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  priceCents   Int
+  available    Boolean     @default(true)
+  imageUrl     String?
+  items        FoodOrderItem[]
+  @@index([restaurantId, available])
+}
+
+model FoodOrder {
+  id           String          @id @default(cuid())
+  customerId   String
+  customer     User            @relation(fields: [customerId], references: [id])
+  restaurantId String
+  restaurant   Restaurant      @relation(fields: [restaurantId], references: [id])
+  status       FoodOrderStatus @default(CREATED)
+  totalCents   Int
+  deliveryAddress String
+  items        FoodOrderItem[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([restaurantId, status])
+}
+
+model FoodOrderItem {
+  id         String    @id @default(cuid())
+  orderId    String
+  order      FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem  @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  unitCents  Int
+  @@index([orderId])
+}
