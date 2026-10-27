@@ -18,7 +18,8 @@
     "@superapp/database": "*",
     "@superapp/rides": "*",
     "@superapp/food": "*",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "pg": "^8.16.0"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
@@ -28,6 +29,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0"
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/pg": "^8.15.0"
   }
 }

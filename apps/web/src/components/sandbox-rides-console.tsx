@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useSandboxOpsFeed } from '@/hooks/use-sandbox-ops-feed';
 import { CarFront, Clock3, CircleCheck, CircleX, RotateCw } from 'lucide-react';
 import { SandboxOperationsOverview, type SandboxOpsTelemetry } from './sandbox-operations-overview';
 import { SandboxRoutePreview } from './sandbox-route-preview';
@@ -36,8 +37,10 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [liveEnabled, setLiveEnabled] = useState(true);
-  const [syncState, setSyncState] = useState<'updating' | 'live' | 'paused' | 'hidden' | 'error'>('live');
   const busyRef = useRef(false);
+  const { mode: syncState } = useSandboxOpsFeed<SandboxSnapshot>({
+    enabled: liveEnabled, busy: working, busyRef, onSnapshot: setSnapshot,
+  });
 
   async function refresh() {
     const response = await fetch('/api/admin/sandbox-rides', {
@@ -73,72 +76,10 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
     busyRef.current = true;
     setWorking(true);
     setError('');
-    try { await refresh(); setSyncState('live'); } catch (cause) {
+    try { await refresh(); } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha ao atualizar a leitura.');
     } finally { busyRef.current = false; setWorking(false); }
   }
-
-  // Read-only polling uses one timer, aborts stale requests and pauses in hidden tabs.
-  // Mutations own the UI while they run; background reads never overwrite them.
-  useEffect(() => {
-    if (!liveEnabled || working) return;
-    let disposed = false;
-    let failures = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let pending: AbortController | undefined;
-
-    const schedule = (delay: number) => {
-      timer = setTimeout(() => { void poll(); }, delay);
-    };
-    async function poll() {
-      if (disposed || busyRef.current) return;
-      if (document.visibilityState !== 'visible') {
-        setSyncState('hidden');
-        return;
-      }
-      pending = new AbortController();
-      const timeout = setTimeout(() => pending?.abort(), 8000);
-      setSyncState('updating');
-      try {
-        const response = await fetch('/api/admin/sandbox-rides', {
-          cache: 'no-store', signal: pending.signal,
-        });
-        if (!response.ok) throw new Error('Leitura indisponível');
-        const data: SandboxSnapshot = await response.json();
-        if (disposed || busyRef.current) return;
-        setSnapshot(data);
-        failures = 0;
-        setSyncState('live');
-        schedule(6000);
-      } catch {
-        if (disposed || pending.signal.aborted && document.visibilityState !== 'visible') return;
-        failures += 1;
-        setSyncState('error');
-        schedule(Math.min(30000, 6000 * 2 ** Math.min(2, failures)));
-      } finally {
-        clearTimeout(timeout);
-        pending = undefined;
-      }
-    }
-    function onVisibility() {
-      if (timer) clearTimeout(timer);
-      if (document.visibilityState !== 'visible') {
-        pending?.abort();
-        setSyncState('hidden');
-      } else {
-        schedule(150);
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibility);
-    if (document.visibilityState === 'visible') schedule(6000);
-    else schedule(0); // poll callback reports hidden state without synchronous effect update
-    return () => {
-      disposed = true;
-      if (timer) clearTimeout(timer);
-      pending?.abort();
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [liveEnabled, working]);
 
   const filteredRides = snapshot.rides.filter(ride =>
     (filter === 'ALL' || ride.status === filter) &&
@@ -157,12 +98,13 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
   ];
   return <div className="sandbox-lab">
     <div className="ops-live-status" role="status" aria-live="polite">
-      <span className={syncState === 'live' && liveEnabled ? 'ops-live-dot' : 'ops-live-dot paused'}/>
+      <span className={liveEnabled && (syncState === 'stream' || syncState === 'polling') ? 'ops-live-dot' : 'ops-live-dot paused'}/>
       <strong>{!liveEnabled ? 'Atualização pausada' : syncState === 'hidden' ? 'Aba oculta: sincronização suspensa' :
-        syncState === 'error' ? 'Falha na leitura — tentando novamente' : syncState === 'updating' ? 'Buscando alterações' : 'Atualização automática ativa'}</strong>
-      <span>Leitura a cada 6 s · sem WebSockets ou GPS real</span>
+        syncState === 'error' ? 'Conexão instável — reconectando' : syncState === 'connecting' ? 'Conectando ao fluxo de eventos' :
+        syncState === 'stream' ? 'Transmissão por eventos ativa' : 'Modo alternativo: consulta periódica'}</strong>
+      <span>{syncState === 'stream' ? 'SSE · PostgreSQL NOTIFY · sem GPS real' : 'Fallback GET a cada 6 s · sem GPS real'}</span>
       <label className="ops-live-switch"><input type="checkbox" checked={liveEnabled}
-        onChange={e => { setLiveEnabled(e.target.checked); setSyncState(e.target.checked ? 'updating' : 'paused'); }}/>
+        onChange={e => setLiveEnabled(e.target.checked)}/>
         Atualização automática
       </label>
     </div>

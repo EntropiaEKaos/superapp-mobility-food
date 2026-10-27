@@ -86,6 +86,9 @@ try {
   const gated = await response('/api/admin/sandbox-rides');
   assert.equal(gated.status, 503, 'ride laboratory remains disabled without explicit flag and secrets');
 
+  const streamed = await response('/api/admin/sandbox-rides/stream');
+  assert.equal(streamed.status, 503, 'admin event stream must remain disabled in demo mode');
+
   const auth = await response('/api/auth/get-session');
   assert.equal(auth.status, 503, 'demo without credentials must not expose a live auth endpoint');
 
