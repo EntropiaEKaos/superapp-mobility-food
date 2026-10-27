@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, CarFront, CheckCircle2, Clock3, Gauge, Refresh
 export type SandboxOpsTelemetry = {
   generatedAt: string;
   recentLimit: number;
+  outboxHealth: { pending: number; published: number; oldestPendingAgeSeconds: number | null; deliveryGuarantee: 'at-least-once-to-broker' };
   streamHealth: { activeConnections: number; capacity: number; availableSlots: number; utilizationPercent: number; transport: 'postgres' | 'redis' };
   metrics: {
     totalRides: number;
@@ -109,6 +110,23 @@ export function SandboxOperationsOverview({
       </div>
       <p>Capacidade disponível: <b>{snapshot.streamHealth.availableSlots}</b> · Máximo de uma conexão por administrador.
         Quando o limite é atingido, o painel pode usar consultas periódicas como alternativa.</p>
+    </section>
+    <section className="ops-outbox-health" aria-label="Saúde da fila durável de eventos">
+      <div className="ops-stream-health-heading">
+        <strong><Activity size={18}/> Eventos duráveis · Outbox</strong>
+        <span>Entrega ao broker com possível repetição</span>
+      </div>
+      <div className="ops-outbox-stats">
+        <span>Pendentes <strong>{snapshot.outboxHealth.pending}</strong></span>
+        <span>Publicados <strong>{snapshot.outboxHealth.published}</strong></span>
+        <span>Evento pendente mais antigo <strong>{snapshot.outboxHealth.oldestPendingAgeSeconds === null
+          ? 'Nenhum' : `${snapshot.outboxHealth.oldestPendingAgeSeconds}s`}</strong></span>
+      </div>
+      {snapshot.outboxHealth.oldestPendingAgeSeconds !== null && snapshot.outboxHealth.oldestPendingAgeSeconds > 15 &&
+        <div className="ops-alert"><AlertTriangle size={17}/>
+          A ponte pode estar indisponível: há eventos ainda não publicados há mais de 15 segundos.
+        </div>}
+      <p>Os registros da outbox persistem no PostgreSQL. O Redis Pub/Sub não oferece replay de notificações a clientes desconectados.</p>
     </section>
     <div className="ops-columns">
       <section className="panel">

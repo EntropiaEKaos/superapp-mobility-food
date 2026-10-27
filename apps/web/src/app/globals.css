@@ -161,3 +161,12 @@
 .ops-stream-meter>div{background:var(--lime);height:100%;border-radius:99px;transition:width .2s ease}
 .ops-stream-health p{margin:0;font-size:12px;color:#b5c8b5;line-height:1.6}
 .ops-stream-health b{color:var(--lime)}
+
+/* Sprint 13: durable outbox backlog indicator */
+.ops-outbox-health{border:1px solid #496a4d;background:#13251b;border-radius:16px;padding:19px;display:grid;gap:13px}
+.ops-outbox-health .ops-stream-health-heading svg{color:var(--lime)}
+.ops-outbox-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ops-outbox-stats span{display:grid;gap:5px;background:#1b3021;border:1px solid #37523f;border-radius:11px;padding:13px;color:#bdd0bd;font-size:11px}
+.ops-outbox-stats strong{font-size:23px;color:#e7f5e4;overflow-wrap:anywhere}
+.ops-outbox-health p{margin:0;font-size:12px;line-height:1.6;color:#b6c9b6}
+@media(max-width:650px){.ops-outbox-stats{grid-template-columns:1fr 1fr}.ops-outbox-stats span:last-child{grid-column:span 2}}
