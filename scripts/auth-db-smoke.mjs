@@ -239,6 +239,12 @@ try {
   assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 409);
   assert.equal((await sandboxCall(adminCookie, { action: 'start', rideId })).status, 409);
   assert.equal((await sandboxCall(adminCookie, { action: 'arrive', rideId })).status, 200);
+  const routePage = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(routePage.status, 200);
+  const routeHtml = await routePage.text();
+  assert.match(routeHtml, /Trajeto ilustrativo, sem mapa ou GPS/, 'route schematic should appear for an active demo ride');
+  assert.match(routeHtml, /Atualização automática/, 'admin may pause/resume polling');
+
   assert.equal((await sandboxCall(adminCookie, { action: 'start', rideId })).status, 409, 'pickup stage requires all waypoints');
 
   // Simultaneous progress attempts must not commit duplicate sequence numbers.
@@ -319,6 +325,12 @@ try {
   // Sprint 08: global aggregates and bounded activity list must agree with the database.
   const opsResponse = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
   assert.equal(opsResponse.status, 200);
+  assert.match(opsResponse.headers.get('cache-control') ?? '', /no-store/);
+  const beforeReads = await pool.query('SELECT COUNT(*)::int AS total FROM "SandboxRideEvent"');
+  const repeatRead = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(repeatRead.status, 200);
+  const afterReads = await pool.query('SELECT COUNT(*)::int AS total FROM "SandboxRideEvent"');
+  assert.equal(afterReads.rows[0].total, beforeReads.rows[0].total, 'polling reads must not create events');
   const ops = await opsResponse.json();
   assert.equal(ops.demo, true);
   assert.ok(ops.generatedAt);
@@ -363,6 +375,9 @@ try {
   assert.match(operationsHtml, /Visão geral da operação/);
   assert.match(operationsHtml, /Diagnóstico de integridade/);
   assert.match(operationsHtml, /Eventos recentes/);
+  assert.match(operationsHtml, /Atualização automática ativa/, 'live status should render');
+  assert.match(operationsHtml, /Leitura a cada 6 s/, 'refresh cadence must be clearly labeled');
+
 
 
   console.log('PASS: auth, sandbox ride lifecycle, 10 simulated positions, sequential event log, concurrency, expiry and cancel.');
