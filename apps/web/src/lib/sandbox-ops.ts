@@ -1,5 +1,6 @@
 import { db } from '@superapp/database';
 import { sandboxSnapshot } from './sandbox-dispatch';
+import { getSandboxStreamHealth } from './sandbox-stream-capacity';
 
 export const SANDBOX_RIDE_STATUSES = [
   'REQUESTED', 'OFFERED', 'ACCEPTED', 'ARRIVING',
@@ -93,10 +94,12 @@ export async function sandboxOperationsSnapshot() {
     ]),
   ) as Record<SandboxStatus, number>;
   const totalRides = Object.values(counts).reduce((sum, quantity) => sum + quantity, 0);
+  const streamHealth = await getSandboxStreamHealth();
 
   return {
     ...snapshot,
     generatedAt: now.toISOString(),
+    streamHealth,
     recentLimit: 20,
     metrics: {
       ridesByStatus: counts,
