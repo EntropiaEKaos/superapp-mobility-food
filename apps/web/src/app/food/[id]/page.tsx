@@ -1,0 +1,6 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
+import { demoRestaurants } from '@superapp/food';
+import { brl } from '@/lib/format';
+export default async function RestaurantPage({params}:{params:Promise<{id:string}>}){const {id}=await params;const restaurant=demoRestaurants.find(r=>r.id===id);if(!restaurant)notFound();return <main className="wrap interior"><Link className="back" href="/food"><ArrowLeft size={16}/> Restaurantes</Link><div className="restaurant-hero"><div className="restaurant-emoji">{restaurant.emoji}</div><div><div className="eyebrow muted">RESTAURANTE DEMONSTRATIVO</div><h1>{restaurant.name}</h1><p>{restaurant.cuisine} • Entrega ilustrativa: {restaurant.eta}</p></div></div><h2 className="subheading">Cardápio</h2><div className="menu-grid">{restaurant.menu.map(item=><article key={item.id} className="menu-item"><span className="menu-emoji">{item.emoji}</span><div><h3>{item.name}</h3><p>{item.description}</p><strong>{brl(item.priceCents)}</strong></div></article>)}</div><div className="info">Pedidos reais e carrinho serão habilitados em uma próxima sprint. Esta vitrine não processa pagamentos.</div></main>}
