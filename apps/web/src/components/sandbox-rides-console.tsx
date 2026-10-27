@@ -13,7 +13,11 @@ type Ride = {
   id: string;
   pickupLabel: string;
   dropoffLabel: string;
-  status: 'REQUESTED' | 'OFFERED' | 'ACCEPTED' | 'EXPIRED' | 'COMPLETED' | 'CANCELED';
+  status: 'REQUESTED' | 'OFFERED' | 'ACCEPTED' | 'ARRIVING' | 'IN_PROGRESS' | 'EXPIRED' | 'COMPLETED' | 'CANCELED';
+  progressStep: number;
+  trackingLat: number | null;
+  trackingLng: number | null;
+  events: Array<{ id: string; sequence: number; type: string; createdAt: string; progressStep: number | null; latitude: number | null; longitude: number | null }>;
   acceptedDriver: { label: string } | null;
   offers: Offer[];
 };
@@ -55,6 +59,7 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
 
   const labels: Record<Ride['status'], string> = {
     REQUESTED: 'Criada', OFFERED: 'Ofertas enviadas', ACCEPTED: 'Aceita',
+    ARRIVING: 'Motorista a caminho', IN_PROGRESS: 'Viagem em andamento',
     EXPIRED: 'Ofertas expiradas', COMPLETED: 'Concluída', CANCELED: 'Cancelada',
   };
   const locations = [
@@ -109,8 +114,38 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
               </button>
             </>}
             {ride.status === 'ACCEPTED' && <button className="btn primary" disabled={working}
-              onClick={() => action({ action: 'complete', rideId: ride.id })}><CircleCheck size={16}/> Finalizar simulação</button>}
+              onClick={() => action({ action: 'arrive', rideId: ride.id })}><CarFront size={16}/> Motorista a caminho</button>}
+            {(ride.status === 'ARRIVING' || ride.status === 'IN_PROGRESS') && ride.progressStep < 5 &&
+              <button className="btn secondary" disabled={working}
+                onClick={() => action({ action: 'advance', rideId: ride.id })}>
+                Avançar posição fictícia ({ride.progressStep + 1}/5)
+              </button>}
+            {ride.status === 'ARRIVING' && ride.progressStep === 5 &&
+              <button className="btn primary" disabled={working}
+                onClick={() => action({ action: 'start', rideId: ride.id })}>Iniciar viagem simulada</button>}
+            {ride.status === 'IN_PROGRESS' && ride.progressStep === 5 &&
+              <button className="btn primary" disabled={working}
+                onClick={() => action({ action: 'complete', rideId: ride.id })}><CircleCheck size={16}/> Finalizar simulação</button>}
+            {(['REQUESTED','OFFERED','ACCEPTED','ARRIVING'] as string[]).includes(ride.status) &&
+              <button className="btn secondary" disabled={working}
+                onClick={() => action({ action: 'cancel', rideId: ride.id })}><CircleX size={16}/> Cancelar simulação</button>}
           </div>
+          {(ride.status === 'ARRIVING' || ride.status === 'IN_PROGRESS' || ride.status === 'COMPLETED') &&
+            <div className="sandbox-tracking">
+              <div><strong>{ride.status === 'ARRIVING' ? 'Rumo ao embarque' : 'Rumo ao destino'} — {ride.progressStep}/5</strong>
+                <span>Posição ilustrativa, sem GPS</span></div>
+              <progress value={ride.progressStep} max={5} aria-label="Progresso fictício da etapa" />
+              {ride.trackingLat !== null && ride.trackingLng !== null &&
+                <code>{ride.trackingLat.toFixed(5)}, {ride.trackingLng.toFixed(5)}</code>}
+            </div>}
+          <details className="sandbox-timeline">
+            <summary>Histórico da corrida ({ride.events?.length ?? 0} eventos)</summary>
+            <ol>{(ride.events ?? []).map(event =>
+              <li key={event.id}><strong>#{event.sequence} · {event.type}</strong>
+                <span>{new Date(event.createdAt).toLocaleString('pt-BR')}
+                  {event.progressStep !== null ? ` · passo ${event.progressStep}/5` : ''}
+                </span></li>)}</ol>
+          </details>
           {ride.offers.length > 0 && <div className="sandbox-offers">
             {ride.offers.map(offer => <div key={offer.id}>
               <span>{offer.driver.label} · {offer.status}</span>

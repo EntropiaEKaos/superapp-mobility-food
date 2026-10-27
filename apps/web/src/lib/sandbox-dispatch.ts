@@ -43,14 +43,24 @@ export async function seedSandbox() {
 export async function createSandboxRide(origin: SandboxLocationId, destination: SandboxLocationId) {
   if (origin === destination) throw new SandboxConflict('Origem e destino devem ser diferentes.');
   const pickup = sandboxLocations[origin];
-  return db().sandboxRide.create({
-    data: {
-      pickupLabel: pickup.label,
-      dropoffLabel: sandboxLocations[destination].label,
-      pickupLat: pickup.lat,
-      pickupLng: pickup.lng,
-    },
-  });
+  return db().$transaction(async tx => {
+    const ride = await tx.sandboxRide.create({
+      data: {
+        pickupLabel: pickup.label,
+        dropoffLabel: sandboxLocations[destination].label,
+        pickupLat: pickup.lat,
+        pickupLng: pickup.lng,
+        dropoffLat: sandboxLocations[destination].lat,
+        dropoffLng: sandboxLocations[destination].lng,
+        version: 1,
+      },
+    });
+    await tx.sandboxRideEvent.create({
+      data: { rideId: ride.id, sequence: 1, type: 'CREATED',
+        toStatus: 'REQUESTED', latitude: pickup.lat, longitude: pickup.lng },
+    });
+    return ride;
+  }, { isolationLevel: 'Serializable' });
 }
 
 /** Two independent offers per ride, all fictitious, no GPS, money or actual dispatch. */
@@ -75,8 +85,12 @@ export async function issueSandboxOffers(rideId: string) {
 
   try {
     return await db().$transaction(async tx => {
-      const changed = await tx.sandboxRide.updateMany({ where: { id: rideId, status: 'REQUESTED' }, data: { status: 'OFFERED' } });
+      const changed = await tx.sandboxRide.updateMany({ where: { id: rideId, status: 'REQUESTED' }, data: { status: 'OFFERED', version: { increment: 1 } } });
       if (changed.count !== 1) throw new SandboxConflict('Ofertas já emitidas para esta corrida.');
+      await tx.sandboxRideEvent.create({
+        data: { rideId, sequence: ride.version + 1, type: 'OFFERED',
+          fromStatus: 'REQUESTED', toStatus: 'OFFERED' },
+      });
       await tx.sandboxRideOffer.createMany({
         data: ranked.map(driver => ({
           rideId, driverId: driver.id,
@@ -110,7 +124,8 @@ export async function acceptSandboxOffer(offerId: string) {
 
       const claimRide = await tx.sandboxRide.updateMany({
         where: { id: offer.rideId, status: 'OFFERED', acceptedDriverId: null },
-        data: { status: 'ACCEPTED', acceptedDriverId: offer.driverId },
+        data: { status: 'ACCEPTED', acceptedDriverId: offer.driverId,
+          trackingLat: null, trackingLng: null, progressStep: 0, version: { increment: 1 } },
       });
       if (claimRide.count !== 1) throw new SandboxConflict('Outra oferta venceu esta corrida.');
 
@@ -120,6 +135,15 @@ export async function acceptSandboxOffer(offerId: string) {
       });
       if (reserveDriver.count !== 1) throw new SandboxConflict('Veículo fictício não está livre.');
 
+      await tx.sandboxRide.update({ where: { id: offer.rideId },
+        data: { trackingLat: (await tx.sandboxDriver.findUniqueOrThrow({ where: { id: offer.driverId } })).lat,
+          trackingLng: (await tx.sandboxDriver.findUniqueOrThrow({ where: { id: offer.driverId } })).lng } });
+      const updatedRide = await tx.sandboxRide.findUnique({ where: { id: offer.rideId } });
+      await tx.sandboxRideEvent.create({
+        data: { rideId: offer.rideId, sequence: updatedRide!.version, type: 'ACCEPTED',
+          fromStatus: 'OFFERED', toStatus: 'ACCEPTED',
+          latitude: null, longitude: null },
+      });
       await tx.sandboxRideOffer.updateMany({
         where: { rideId: offer.rideId, id: { not: offerId }, status: 'PENDING' },
         data: { status: 'DECLINED' },
@@ -143,7 +167,17 @@ export async function expireSandboxOffers(rideId: string, advanceSeconds = 0) {
         data: { status: 'EXPIRED' },
       });
       const pending = await tx.sandboxRideOffer.count({ where: { rideId, status: 'PENDING' } });
-      if (pending === 0) await tx.sandboxRide.updateMany({ where: { id: rideId, status: 'OFFERED' }, data: { status: 'EXPIRED' } });
+      if (pending === 0) {
+        const changed = await tx.sandboxRide.updateMany({
+          where: { id: rideId, status: 'OFFERED', version: ride.version },
+          data: { status: 'EXPIRED', version: { increment: 1 } },
+        });
+        if (changed.count !== 1) throw new SandboxConflict('Outra atualização foi confirmada.');
+        await tx.sandboxRideEvent.create({
+          data: { rideId, sequence: ride.version + 1, type: 'EXPIRED',
+            fromStatus: 'OFFERED', toStatus: 'EXPIRED' },
+        });
+      }
       return tx.sandboxRide.findUnique({ where: { id: rideId }, include: { offers: true } });
     }, { isolationLevel: 'Serializable' });
   } catch {
@@ -152,18 +186,9 @@ export async function expireSandboxOffers(rideId: string, advanceSeconds = 0) {
 }
 
 export async function completeSandboxRide(rideId: string) {
-  try {
-    return await db().$transaction(async tx => {
-      const ride = await tx.sandboxRide.findUnique({ where: { id: rideId } });
-      if (!ride || ride.status !== 'ACCEPTED' || !ride.acceptedDriverId) throw new SandboxConflict('Corrida não aceita.');
-      const changed = await tx.sandboxRide.updateMany({ where: { id: rideId, status: 'ACCEPTED' }, data: { status: 'COMPLETED' } });
-      if (changed.count !== 1) throw new SandboxConflict('Corrida já concluída.');
-      await tx.sandboxDriver.update({ where: { id: ride.acceptedDriverId }, data: { busy: false } });
-      return tx.sandboxRide.findUnique({ where: { id: rideId }, include: { acceptedDriver: true } });
-    }, { isolationLevel: 'Serializable' });
-  } catch {
-    throw new SandboxConflict('Falha ao concluir a corrida fictícia.');
-  }
+  // Compatibility wrapper: full journey must reach IN_PROGRESS + 5 waypoints.
+  const { transitionSandboxJourney } = await import('./sandbox-journey');
+  return transitionSandboxJourney(rideId, 'complete');
 }
 
 export async function resetSandbox() {
@@ -179,7 +204,9 @@ export async function sandboxSnapshot() {
     db().sandboxDriver.findMany({ orderBy: { id: 'asc' } }),
     db().sandboxRide.findMany({
       orderBy: { createdAt: 'desc' }, take: 20,
-      include: { offers: { include: { driver: { select: { label: true } } }, orderBy: { createdAt: 'asc' } }, acceptedDriver: { select: { label: true } } },
+      include: { offers: { include: { driver: { select: { label: true } } }, orderBy: { createdAt: 'asc' } },
+        acceptedDriver: { select: { label: true } },
+        events: { orderBy: { sequence: 'asc' } } },
     }),
   ]);
   return { demo: true as const, drivers, rides };

@@ -225,9 +225,23 @@ enum SandboxRideStatus {
   REQUESTED
   OFFERED
   ACCEPTED
+  ARRIVING
+  IN_PROGRESS
   EXPIRED
   COMPLETED
   CANCELED
+}
+
+enum SandboxRideEventType {
+  CREATED
+  OFFERED
+  ACCEPTED
+  ARRIVING
+  IN_PROGRESS
+  LOCATION_UPDATED
+  COMPLETED
+  CANCELED
+  EXPIRED
 }
 
 enum SandboxOfferStatus {
@@ -258,12 +272,19 @@ model SandboxRide {
   dropoffLabel     String
   pickupLat        Float
   pickupLng        Float
+  dropoffLat       Float?
+  dropoffLng       Float?
+  version          Int                @default(0)
+  progressStep     Int                @default(0)
+  trackingLat      Float?
+  trackingLng      Float?
   status           SandboxRideStatus  @default(REQUESTED)
   acceptedDriverId String?
   acceptedDriver   SandboxDriver?     @relation("SandboxWinner", fields: [acceptedDriverId], references: [id], onDelete: SetNull)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   offers           SandboxRideOffer[]
+  events           SandboxRideEvent[]
 
   @@index([status, createdAt])
   @@index([acceptedDriverId])
@@ -283,4 +304,21 @@ model SandboxRideOffer {
   @@unique([rideId, driverId])
   @@index([rideId, status, expiresAt])
   @@index([driverId, status])
+}
+
+model SandboxRideEvent {
+  id          String               @id @default(cuid())
+  rideId      String
+  ride        SandboxRide          @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  sequence    Int
+  type        SandboxRideEventType
+  fromStatus  String?
+  toStatus    String?
+  progressStep Int?
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime             @default(now())
+
+  @@unique([rideId, sequence])
+  @@index([rideId, createdAt])
 }
