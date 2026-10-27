@@ -131,7 +131,7 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
     }
     document.addEventListener('visibilitychange', onVisibility);
     if (document.visibilityState === 'visible') schedule(6000);
-    else setSyncState('hidden');
+    else schedule(0); // poll callback reports hidden state without synchronous effect update
     return () => {
       disposed = true;
       if (timer) clearTimeout(timer);
