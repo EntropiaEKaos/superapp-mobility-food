@@ -68,3 +68,53 @@ jobs:
         run: npm run build
       - name: Verify sign-up, sessions, roles and PostgreSQL
         run: node scripts/auth-db-smoke.mjs
+
+
+  redis-integration:
+    name: PostgreSQL + Redis broker integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: superapp_ci
+          POSTGRES_PASSWORD: superapp_ci_password
+          POSTGRES_DB: superapp_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U superapp_ci -d superapp_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://superapp_ci:superapp_ci_password@127.0.0.1:5432/superapp_ci?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      BETTER_AUTH_SECRET: local-ci-test-secret-only-32-chars-123456
+      BETTER_AUTH_URL: http://localhost:3189
+      NEXT_PUBLIC_APP_URL: http://localhost:3189
+      ENABLE_SANDBOX_DISPATCH: 'true'
+      SANDBOX_EVENT_TRANSPORT: redis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Apply versioned migrations
+        run: npm run db:deploy
+      - name: Build Next.js for Redis test
+        run: npm run build
+      - name: Verify PostgreSQL bridge, Redis PubSub, SSE reconnect and capacity
+        run: node scripts/redis-bridge-smoke.mjs
