@@ -5,6 +5,7 @@ import { db } from '@superapp/database';
 import { sandboxEnabled } from '@/lib/sandbox-dispatch';
 import { sandboxOperationsSnapshot } from '@/lib/sandbox-ops';
 import { acquireSandboxStreamSlot } from '@/lib/sandbox-stream-capacity';
+import { openRedisSandboxStream } from '@/lib/sandbox-redis-stream';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,12 @@ export async function GET(req: NextRequest) {
     authenticatedAdminId = session.user.id;
   } catch {
     return NextResponse.json({ error: 'Falha ao validar acesso.' }, { status: 503 });
+  }
+
+  // Explicit opt-in: Redis broker removes the per-SSE PostgreSQL LISTEN connection.
+  // Missing Redis config fails closed instead of silently exhausting the PG budget.
+  if (process.env.SANDBOX_EVENT_TRANSPORT === 'redis') {
+    return openRedisSandboxStream(req, authenticatedAdminId);
   }
 
   const client = new Client({
