@@ -120,3 +120,5 @@ jobs:
         run: node scripts/redis-bridge-smoke.mjs
       - name: Verify durable outbox, rollback isolation and broker recovery
         run: node scripts/outbox-recovery-smoke.mjs
+      - name: Verify retry, dead-letter, retention and concurrent-worker load
+        run: node scripts/outbox-retry-smoke.mjs
