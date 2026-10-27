@@ -64,6 +64,7 @@ model User {
   restaurants   Restaurant[]
   foodOrders    FoodOrder[]
   partnerApplications PartnerApplication[]
+  reviewedPartnerApplications PartnerApplication[] @relation("PartnerReview")
   vehicles      Vehicle[]
   @@map("users")
 }
@@ -210,7 +211,11 @@ model PartnerApplication {
   city        String
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
+  reviewedAt  DateTime?
+  reviewerId  String?
+  reviewer    User?                    @relation("PartnerReview", fields: [reviewerId], references: [id], onDelete: SetNull)
 
   @@unique([userId, kind])
   @@index([status, createdAt])
+  @@index([reviewerId])
 }

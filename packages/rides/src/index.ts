@@ -22,3 +22,6 @@ export function estimateRide(origin: GeoPoint, destination: GeoPoint, category: 
   const multiplier = category === 'comfort' ? 1.4 : 1;
   return { straightLineKm: Number(km.toFixed(2)), estimatedFareCents: Math.round((650 + km*280) * multiplier), category, demo: true };
 }
+
+export { rankDemoDrivers } from './dispatch';
+export type { DemoDriver, RankedDemoDriver, DemoDispatchOptions } from './dispatch';

@@ -119,7 +119,85 @@ try {
   assert.equal(onboardingPage.status, 200);
   assert.match(await onboardingPage.text(), /CI Motorista/);
 
-  console.log('PASS: migrations, sign-up, sessions, admin deny, pending partner application, ownership and uniqueness.');
+
+  // Admin review is server-authorized and cannot change the applicant's role.
+  const anonymousReview = await request('/api/admin/partner-applications');
+  assert.equal(anonymousReview.status, 401);
+  const unauthorizedReview = await request('/api/admin/partner-applications', {
+    headers: { Cookie: cookies, Origin: origin },
+  });
+  assert.equal(unauthorizedReview.status, 403, 'ordinary customers cannot list the admin queue');
+  const customerDecision = await request('/api/admin/partner-applications', {
+    method: 'PATCH', headers: { Cookie: cookies, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: created.application.id, decision: 'APPROVED' }),
+  });
+  assert.equal(customerDecision.status, 403, 'ordinary customers cannot approve applications');
+
+  const adminEmail = `admin-${process.pid}@example.invalid`;
+  const adminRegister = await request('/api/auth/sign-up/email', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin },
+    body: JSON.stringify({ name: 'CI Admin', email: adminEmail, password }),
+  });
+  assert.equal(adminRegister.status, 200, 'admin account must first register as a normal customer');
+  const adminCookie = adminRegister.headers.getSetCookie().map(v => v.split(';')[0]).join('; ');
+  assert.ok(adminCookie);
+  // CI-only trusted bootstrap; production must provision admins out-of-band.
+  const promoted = await pool.query('UPDATE "users" SET "role" = $1 WHERE "email" = $2', ['ADMIN', adminEmail]);
+  assert.equal(promoted.rowCount, 1);
+
+  const queue = await request('/api/admin/partner-applications', { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(queue.status, 200);
+  const queueBody = await queue.json();
+  assert.ok(queueBody.applications.some(item => item.id === created.application.id));
+
+  const adminPage = await request('/admin', { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(adminPage.status, 200);
+  assert.match(await adminPage.text(), /Análise de parceiros/);
+
+  const forged = await request('/api/admin/partner-applications', {
+    method: 'PATCH', headers: { Cookie: adminCookie, Origin: 'https://wrong.example.invalid', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: created.application.id, decision: 'APPROVED' }),
+  });
+  assert.equal(forged.status, 403, 'cross-origin admin decision must be rejected');
+
+  const invalidDecision = await request('/api/admin/partner-applications', {
+    method: 'PATCH', headers: { Cookie: adminCookie, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: created.application.id, decision: 'ADMIN' }),
+  });
+  assert.equal(invalidDecision.status, 422);
+
+  const approve = await request('/api/admin/partner-applications', {
+    method: 'PATCH', headers: { Cookie: adminCookie, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: created.application.id, decision: 'APPROVED' }),
+  });
+  const approvedBody = await approve.text();
+  assert.equal(approve.status, 200, 'approval succeeds: ' + approvedBody.slice(0, 500));
+  const decisionRecord = await pool.query('SELECT "status", "reviewerId", "reviewedAt" FROM "PartnerApplication" WHERE "id" = $1', [created.application.id]);
+  assert.equal(decisionRecord.rows[0].status, 'APPROVED');
+  assert.ok(decisionRecord.rows[0].reviewerId);
+  assert.ok(decisionRecord.rows[0].reviewedAt);
+
+  const replay = await request('/api/admin/partner-applications', {
+    method: 'PATCH', headers: { Cookie: adminCookie, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: created.application.id, decision: 'REJECTED' }),
+  });
+  assert.equal(replay.status, 409, 'a second decision cannot overwrite the first');
+
+  const applicantRole = await pool.query('SELECT "role" FROM "users" WHERE "email" = $1', [email]);
+  assert.equal(applicantRole.rows[0].role, 'CUSTOMER', 'application approval never grants driver or admin role');
+
+  const ownApplication = await request('/api/partners/applications', {
+    method: 'POST', headers: { Cookie: adminCookie, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'COURIER', displayName: 'Admin Applicant', city: 'Praia Grande' }),
+  });
+  assert.equal(ownApplication.status, 201);
+  const own = await ownApplication.json();
+  const selfApproval = await request('/api/admin/partner-applications', {
+    method: 'PATCH', headers: { Cookie: adminCookie, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: own.application.id, decision: 'APPROVED' }),
+  });
+  assert.equal(selfApproval.status, 409, 'administrators must not review their own applications');
+  console.log('PASS: PostgreSQL auth, partner onboarding, admin review access, atomic decisions, audit and self-review guard.');
 } catch (error) {
   console.error(error);
   console.error('Web server logs:', logs.slice(-7000));
