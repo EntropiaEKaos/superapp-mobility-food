@@ -49,6 +49,7 @@ jobs:
       BETTER_AUTH_SECRET: local-ci-test-secret-only-32-chars-123456
       BETTER_AUTH_URL: http://localhost:3188
       NEXT_PUBLIC_APP_URL: http://localhost:3188
+      ENABLE_SANDBOX_DISPATCH: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

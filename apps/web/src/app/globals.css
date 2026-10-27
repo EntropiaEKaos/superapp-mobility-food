@@ -58,3 +58,14 @@
 .review-actions .btn{padding:12px 16px}
 .review-console .notice{display:flex;align-items:center;gap:9px}
 @media(max-width:660px){.review-kpis{grid-template-columns:1fr 1fr}.review-heading{flex-direction:column}.review-status{align-self:flex-start}}
+
+/* Sprint 06 - admin-only transactional sandbox */
+.sandbox-lab{display:grid;gap:22px}
+.sandbox-controls{display:flex;gap:14px;flex-wrap:wrap;align-items:end}
+.sandbox-controls label{display:flex;flex-direction:column;gap:8px;color:#c7d9cb;font-weight:700;font-size:12px}
+.sandbox-controls select{min-width:156px;padding:13px;background:#0d1710;border:1px solid #536555;color:#eef7ed;border-radius:11px}
+.sandbox-offers{display:grid;gap:9px;margin-top:16px}
+.sandbox-offers>div{padding:11px 14px;border-radius:10px;background:#0d1b13;display:flex;align-items:center;justify-content:space-between;gap:15px;font-size:13px}
+.sandbox-offers button{display:inline-flex;align-items:center;gap:7px;border:1px solid #6a905c;border-radius:9px;background:#263d2b;color:#f2faef;padding:9px 12px}
+.sandbox-reset{margin-top:22px}
+@media(max-width:640px){.sandbox-controls{flex-direction:column;align-items:stretch}.sandbox-offers>div{align-items:flex-start;flex-direction:column}}

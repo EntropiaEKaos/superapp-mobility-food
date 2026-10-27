@@ -83,6 +83,9 @@ try {
   const protectedReview = await response('/api/admin/partner-applications');
   assert.equal(protectedReview.status, 503, 'admin API must stay disabled in no-database demo');
 
+  const gated = await response('/api/admin/sandbox-rides');
+  assert.equal(gated.status, 503, 'ride laboratory remains disabled without explicit flag and secrets');
+
   const auth = await response('/api/auth/get-session');
   assert.equal(auth.status, 503, 'demo without credentials must not expose a live auth endpoint');
 
