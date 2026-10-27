@@ -1,5 +1,7 @@
 -- Sprint 07: isolated sandbox journey transitions and append-only timeline.
 -- Nullable destinations preserve older sandbox fixture records; new rides populate both.
+ALTER TYPE "SandboxRideStatus" ADD VALUE 'ARRIVING' BEFORE 'EXPIRED';
+ALTER TYPE "SandboxRideStatus" ADD VALUE 'IN_PROGRESS' BEFORE 'EXPIRED';
 CREATE TYPE "SandboxRideEventType" AS ENUM (
   'CREATED', 'OFFERED', 'ACCEPTED', 'ARRIVING', 'IN_PROGRESS',
   'LOCATION_UPDATED', 'COMPLETED', 'CANCELED', 'EXPIRED'
