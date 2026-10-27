@@ -27,3 +27,43 @@ jobs:
           BETTER_AUTH_SECRET: placeholder-only-for-ci-32-chars-xx
       - name: Smoke test (demo mode, no payments or database)
         run: node scripts/smoke.mjs
+
+  postgres-integration:
+    name: PostgreSQL + Auth integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: superapp_ci
+          POSTGRES_PASSWORD: superapp_ci_password
+          POSTGRES_DB: superapp_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U superapp_ci -d superapp_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://superapp_ci:superapp_ci_password@127.0.0.1:5432/superapp_ci?schema=public
+      BETTER_AUTH_SECRET: local-ci-test-secret-only-32-chars-123456
+      BETTER_AUTH_URL: http://localhost:3188
+      NEXT_PUBLIC_APP_URL: http://localhost:3188
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Apply versioned migrations
+        run: npm run db:deploy
+      - name: Verify database matches Prisma schema
+        run: npm exec -w @superapp/database -- prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Build web app for integration test
+        run: npm run build
+      - name: Verify sign-up, sessions, roles and PostgreSQL
+        run: node scripts/auth-db-smoke.mjs
