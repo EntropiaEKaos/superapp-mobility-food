@@ -461,26 +461,39 @@ try {
 
 
 
-  // Sprint 11: capacity is shared through PostgreSQL session advisory locks.
-  // Register fake admins to simulate different administrators sharing one database.
+  // Sprint 11: simulate competing app instances with PostgreSQL session locks.
+  // Reuse the test's existing two authenticated users rather than weakening
+  // Better Auth sign-up limits to register eight new accounts.
   const sockets = [];
-  const streamTestUsers = [];
+  const simulatedRemoteListeners = [];
   async function streamFor(cookie) {
     const controller = new AbortController();
     const response = await fetch(origin + streamPath, {
       headers: { Cookie: cookie }, signal: controller.signal,
     });
-    if (response.status !== 200) {
-      // An HTTP 429 is a finite JSON response: let callers inspect it
-      // before discarding the request. Aborting first breaks response.json().
-      return { response, controller: null };
-    }
+    if (response.status !== 200) return { response, controller: null };
     const reader = response.body.getReader();
     const firstPacket = await reader.read();
     assert.equal(firstPacket.done, false, 'each admitted SSE must send initial data');
-    sockets.push({ controller, reader });
+    const handle = { controller, reader };
+    sockets.push(handle);
     return { response, controller };
   }
+  async function stopStream(handle) {
+    await handle.reader.cancel().catch(() => undefined);
+    handle.controller.abort();
+  }
+  async function expectConnections(count) {
+    for (let i = 0; i < 50; i++) {
+      const response = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+      assert.equal(response.status, 200);
+      const state = await response.json();
+      if (state.streamHealth.activeConnections === count) return state.streamHealth;
+      await sleep(100);
+    }
+    throw new Error('Expected stream connections: ' + count);
+  }
+
   try {
     const firstAdminStream = await streamFor(adminCookie);
     assert.equal(firstAdminStream.response.status, 200);
@@ -489,68 +502,58 @@ try {
     assert.equal((await sameAdminStream.response.json()).code, 'user_busy');
     assert.equal(sameAdminStream.response.headers.get('retry-after'), '30');
 
-    for (let i = 1; i < 8; i++) {
-      const nextEmail = `sse-admin-${process.pid}-${i}@example.invalid`;
-      const createdAccount = await request('/api/auth/sign-up/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: origin },
-        body: JSON.stringify({ name: `CI Stream Admin ${i}`, email: nextEmail, password }),
+    // This user has a signed-in session already; grant ADMIN only in ephemeral CI.
+    await pool.query('UPDATE "users" SET "role" = $1 WHERE "email" = $2', ['ADMIN', email]);
+    const otherAdminStream = await streamFor(cookies);
+    assert.equal(otherAdminStream.response.status, 200,
+      'two independent administrators can stream at the same time');
+    const twoAdmins = await expectConnections(2);
+    assert.equal(twoAdmins.capacity, 8);
+
+    await stopStream(sockets[0]);
+    await stopStream(sockets[1]);
+    await expectConnections(0);
+
+    // Dedicated database sessions emulate several separate web instances.
+    // Advisory locks share the same PostgreSQL-wide budget regardless of host.
+    for (let slot = 0; slot < 8; slot++) {
+      const external = new pg.Client({
+        connectionString: process.env.DATABASE_URL,
+        application_name: 'superapp-sandbox-sse',
       });
-      assert.equal(createdAccount.status, 200, 'fake admin account registered');
-      const nextCookie = createdAccount.headers.getSetCookie().map(v => v.split(';')[0]).join('; ');
-      assert.ok(nextCookie);
-      await pool.query('UPDATE "users" SET "role" = $1 WHERE "email" = $2', ['ADMIN', nextEmail]);
-      streamTestUsers.push(nextCookie);
-      const open = await streamFor(nextCookie);
-      assert.equal(open.response.status, 200, `SSE stream ${i} of eight must be admitted`);
+      await external.connect();
+      simulatedRemoteListeners.push(external);
+      const lock = await external.query(
+        'SELECT pg_try_advisory_lock($1::int, $2::int) AS acquired',
+        [56011002, slot],
+      );
+      assert.equal(lock.rows[0].acquired, true, 'remote session holds its global slot');
     }
+    const saturated = await expectConnections(8);
+    assert.equal(saturated.capacity, 8);
+    assert.equal(saturated.availableSlots, 0);
+    assert.equal(saturated.utilizationPercent, 100);
 
-    const health = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
-    assert.equal(health.status, 200);
-    const healthBody = await health.json();
-    assert.equal(healthBody.streamHealth.capacity, 8);
-    assert.equal(healthBody.streamHealth.activeConnections, 8);
-    assert.equal(healthBody.streamHealth.availableSlots, 0);
-    assert.equal(healthBody.streamHealth.utilizationPercent, 100);
-
-    const lastEmail = `sse-admin-${process.pid}-overflow@example.invalid`;
-    const lastRegister = await request('/api/auth/sign-up/email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: origin },
-      body: JSON.stringify({ name: 'CI Overflow Admin', email: lastEmail, password }),
-    });
-    assert.equal(lastRegister.status, 200);
-    const lastCookie = lastRegister.headers.getSetCookie().map(v => v.split(';')[0]).join('; ');
-    await pool.query('UPDATE "users" SET "role" = $1 WHERE "email" = $2', ['ADMIN', lastEmail]);
-    const ninth = await streamFor(lastCookie);
-    assert.equal(ninth.response.status, 429, 'ninth admin cannot consume a ninth DB connection');
+    const ninth = await streamFor(adminCookie);
+    assert.equal(ninth.response.status, 429, 'all eight DB slots block a new SSE stream');
     assert.equal((await ninth.response.json()).code, 'capacity_reached');
 
-    await sockets[0].reader.cancel();
-    sockets[0].controller.abort();
-    for (let i = 0; i < 40; i++) {
-      const state = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
-      const data = await state.json();
-      if (data.streamHealth.activeConnections === 7) break;
-      await sleep(100);
-    }
-    const reopened = await streamFor(lastCookie);
-    assert.equal(reopened.response.status, 200, 'capacity must be released when an SSE client disconnects');
-    const finalHealth = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
-    const finalState = await finalHealth.json();
-    assert.equal(finalState.streamHealth.activeConnections, 8, 'all eight stream slots reused safely');
-    assert.equal(finalState.streamHealth.availableSlots, 0);
+    await simulatedRemoteListeners[0].end();
+    await expectConnections(7);
+    const recovered = await streamFor(adminCookie);
+    assert.equal(recovered.response.status, 200,
+      'new stream can reuse a slot released by another PostgreSQL instance');
+    const reoccupied = await expectConnections(8);
+    assert.equal(reoccupied.availableSlots, 0);
   } finally {
-    for (const socket of sockets) {
-      await socket.reader.cancel().catch(() => undefined);
-      socket.controller.abort();
-    }
+    for (const socket of sockets) await stopStream(socket);
+    for (const remote of simulatedRemoteListeners) await remote.end().catch(() => undefined);
   }
   const finalOperations = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
   assert.equal(finalOperations.status, 200);
   assert.match(await finalOperations.text(), /Conexões em tempo real/);
 
-  console.log('PASS: auth, SSE notify/reconnect, eight global slots, admin uniqueness, capacity release and ride concurrency.');
+  console.log('PASS: auth, SSE notify/reconnect, shared global slots, two admins, admin uniqueness and capacity release and ride concurrency.');
 
 } catch (error) {
   console.error(error);
