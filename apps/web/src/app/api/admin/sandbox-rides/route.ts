@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { advanceSandboxTracking, transitionSandboxJourney } from '@/lib/sandbox-journey';
 import { authConfigured, getAuth } from '@/lib/auth';
 import { db } from '@superapp/database';
 import {
-  acceptSandboxOffer, completeSandboxRide, createSandboxRide,
+  acceptSandboxOffer, createSandboxRide,
   expireSandboxOffers, issueSandboxOffers, resetSandbox, sandboxEnabled,
   sandboxSnapshot, seedSandbox, validLocation, SandboxConflict,
 } from '@/lib/sandbox-dispatch';
@@ -71,9 +72,19 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Expiração inválida.' }, { status: 422 });
         }
         result = await expireSandboxOffers(input.rideId, typeof input.advanceSeconds === 'number' ? input.advanceSeconds : 0); break;
+      case 'arrive':
+      case 'start':
       case 'complete':
-        if (typeof input.rideId !== 'string') return NextResponse.json({ error: 'Corrida inválida.' }, { status: 422 });
-        result = await completeSandboxRide(input.rideId); break;
+      case 'cancel':
+        if (typeof input.rideId !== 'string' || input.rideId.length > 80) {
+          return NextResponse.json({ error: 'Corrida inválida.' }, { status: 422 });
+        }
+        result = await transitionSandboxJourney(input.rideId, input.action); break;
+      case 'advance':
+        if (typeof input.rideId !== 'string' || input.rideId.length > 80) {
+          return NextResponse.json({ error: 'Corrida inválida.' }, { status: 422 });
+        }
+        result = await advanceSandboxTracking(input.rideId); break;
       default:
         return NextResponse.json({ error: 'Ação desconhecida.' }, { status: 422 });
     }
