@@ -92,7 +92,7 @@ async function drain() {
         wakeAgain = !failed;
         if (failed && !redis.isReady) {
           console.error('Redis connection unavailable; relay requires supervisor restart.');
-          void close(1);
+          setImmediate(() => { void close(1); });
         }
       } catch (error) {
         await worker.query('ROLLBACK').catch(() => undefined);
