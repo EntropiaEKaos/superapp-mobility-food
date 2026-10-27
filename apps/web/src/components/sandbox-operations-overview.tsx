@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, CarFront, CheckCircle2, Clock3, Gauge, Refresh
 export type SandboxOpsTelemetry = {
   generatedAt: string;
   recentLimit: number;
-  outboxHealth: { pending: number; published: number; oldestPendingAgeSeconds: number | null; deliveryGuarantee: 'at-least-once-to-broker' };
+  outboxHealth: { pending: number; published: number; dead: number; retrying: number; oldestDeadAgeSeconds: number | null; oldestPendingAgeSeconds: number | null; deliveryGuarantee: 'at-least-once-to-broker' };
   streamHealth: { activeConnections: number; capacity: number; availableSlots: number; utilizationPercent: number; transport: 'postgres' | 'redis' };
   metrics: {
     totalRides: number;
@@ -119,9 +119,14 @@ export function SandboxOperationsOverview({
       <div className="ops-outbox-stats">
         <span>Pendentes <strong>{snapshot.outboxHealth.pending}</strong></span>
         <span>Publicados <strong>{snapshot.outboxHealth.published}</strong></span>
+        <span>Em nova tentativa <strong>{snapshot.outboxHealth.retrying}</strong></span>
+        <span>Intervenção necessária <strong>{snapshot.outboxHealth.dead}</strong></span>
         <span>Evento pendente mais antigo <strong>{snapshot.outboxHealth.oldestPendingAgeSeconds === null
           ? 'Nenhum' : `${snapshot.outboxHealth.oldestPendingAgeSeconds}s`}</strong></span>
       </div>
+      {snapshot.outboxHealth.dead > 0 && <div className="ops-alert">
+        <AlertTriangle size={17}/> Há {snapshot.outboxHealth.dead} eventos com tentativas esgotadas. Revisão administrativa necessária; nenhuma republicação automática.
+      </div>}
       {snapshot.outboxHealth.oldestPendingAgeSeconds !== null && snapshot.outboxHealth.oldestPendingAgeSeconds > 15 &&
         <div className="ops-alert"><AlertTriangle size={17}/>
           A ponte pode estar indisponível: há eventos ainda não publicados há mais de 15 segundos.

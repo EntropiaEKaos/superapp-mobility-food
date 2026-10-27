@@ -94,17 +94,31 @@ export async function sandboxOperationsSnapshot() {
       status, statusGroups.find(group => group.status === status)?._count._all ?? 0,
     ]),
   ) as Record<SandboxStatus, number>;
-  const [pendingOutbox, publishedOutbox, oldestPending] = await Promise.all([
+  const [pendingOutbox, publishedOutbox, deadOutbox, retryingOutbox,
+    oldestPending, oldestDead] = await Promise.all([
     db().sandboxEventOutbox.count({ where: { status: 'PENDING' } }),
     db().sandboxEventOutbox.count({ where: { status: 'PUBLISHED' } }),
+    db().sandboxEventOutbox.count({ where: { status: 'DEAD' } }),
+    db().sandboxEventOutbox.count({
+      where: { status: 'PENDING', attempts: { gt: 0 } },
+    }),
     db().sandboxEventOutbox.findFirst({
-      where: { status: 'PENDING' }, orderBy: { id: 'asc' },
+      where: { status: 'PENDING' }, orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
+    db().sandboxEventOutbox.findFirst({
+      where: { status: 'DEAD' }, orderBy: { createdAt: 'asc' },
       select: { createdAt: true },
     }),
   ]);
   const outboxHealth = {
     pending: pendingOutbox,
     published: publishedOutbox,
+    dead: deadOutbox,
+    retrying: retryingOutbox,
+    oldestDeadAgeSeconds: oldestDead
+      ? Math.max(0, Math.floor((now.getTime() - oldestDead.createdAt.getTime()) / 1000))
+      : null,
     oldestPendingAgeSeconds: oldestPending
       ? Math.max(0, Math.floor((now.getTime() - oldestPending.createdAt.getTime()) / 1000))
       : null,
