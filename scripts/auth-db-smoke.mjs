@@ -234,10 +234,54 @@ try {
   assert.deepEqual(statuses.rows.map(row => row.status).sort(), ['ACCEPTED', 'DECLINED']);
   const busyDriver = await pool.query('SELECT "busy" FROM "SandboxDriver" WHERE "id" = $1', [ledger.rows[0].acceptedDriverId]);
   assert.equal(busyDriver.rows[0].busy, true, 'winning driver reserved exactly once');
+
+  // New state machine: no direct ACCEPTED -> COMPLETED shortcut.
+  assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 409);
+  assert.equal((await sandboxCall(adminCookie, { action: 'start', rideId })).status, 409);
+  assert.equal((await sandboxCall(adminCookie, { action: 'arrive', rideId })).status, 200);
+  assert.equal((await sandboxCall(adminCookie, { action: 'start', rideId })).status, 409, 'pickup stage requires all waypoints');
+
+  // Simultaneous progress attempts must not commit duplicate sequence numbers.
+  const steps = await Promise.all([
+    sandboxCall(adminCookie, { action: 'advance', rideId }),
+    sandboxCall(adminCookie, { action: 'advance', rideId }),
+  ]);
+  assert.deepEqual(steps.map(x => x.status).sort((a, b) => a - b), [200, 409],
+    'concurrent tracking updates must have exactly one winner');
+  for (let index = 1; index < 5; index++) {
+    assert.equal((await sandboxCall(adminCookie, { action: 'advance', rideId })).status, 200);
+  }
+  assert.equal((await sandboxCall(adminCookie, { action: 'advance', rideId })).status, 409,
+    'completed approach cannot move past waypoint 5');
+  assert.equal((await sandboxCall(adminCookie, { action: 'start', rideId })).status, 200);
+  assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 409,
+    'in-progress stage requires final waypoint');
+  for (let index = 0; index < 5; index++) {
+    assert.equal((await sandboxCall(adminCookie, { action: 'advance', rideId })).status, 200);
+  }
   assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 200);
   assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 409);
+  assert.equal((await sandboxCall(adminCookie, { action: 'cancel', rideId })).status, 409,
+    'completed rides must be immutable');
   const released = await pool.query('SELECT "busy" FROM "SandboxDriver" WHERE "id" = $1', [ledger.rows[0].acceptedDriverId]);
   assert.equal(released.rows[0].busy, false, 'completing the demo ride releases the simulated driver');
+
+  const journey = await pool.query(
+    'SELECT "sequence", "type", "progressStep", "latitude", "longitude" FROM "SandboxRideEvent" WHERE "rideId"=$1 ORDER BY "sequence"',
+    [rideId],
+  );
+  const events = journey.rows;
+  assert.deepEqual(events.map(e => e.sequence), events.map((_, i) => i + 1),
+    'the event log must be append-only with contiguous versions');
+  assert.equal(events[0].type, 'CREATED');
+  assert.ok(events.some(e => e.type === 'OFFERED'));
+  assert.ok(events.some(e => e.type === 'ACCEPTED'));
+  assert.ok(events.some(e => e.type === 'ARRIVING'));
+  assert.ok(events.some(e => e.type === 'IN_PROGRESS'));
+  assert.equal(events.filter(e => e.type === 'LOCATION_UPDATED').length, 10);
+  assert.equal(events.at(-1).type, 'COMPLETED');
+  assert.ok(events.filter(e => e.type === 'LOCATION_UPDATED').every(e =>
+    Number.isFinite(e.latitude) && Number.isFinite(e.longitude)), 'tracking coordinates must be deterministic numeric points');
 
   const newRide = await sandboxCall(adminCookie, { action: 'create', origin: 'boqueirao', destination: 'guilhermina' });
   assert.equal(newRide.status, 200);
@@ -252,6 +296,19 @@ try {
   assert.ok(expiredRecord.offers.every(o => o.status === 'EXPIRED'));
   assert.equal((await sandboxCall(adminCookie, { action: 'accept', offerId: staleOffers[0].id })).status, 409,
     'expired offers must not be accepted');
+  const canceled = await sandboxCall(adminCookie, { action: 'create', origin: 'boqueirao', destination: 'caicara' });
+  assert.equal(canceled.status, 200);
+  const canceledRideId = (await canceled.json()).result.id;
+  assert.equal((await sandboxCall(adminCookie, { action: 'offer', rideId: canceledRideId })).status, 200);
+  assert.equal((await sandboxCall(adminCookie, { action: 'cancel', rideId: canceledRideId })).status, 200);
+  assert.equal((await sandboxCall(adminCookie, { action: 'cancel', rideId: canceledRideId })).status, 409);
+  const canceledLedger = await pool.query(
+    'SELECT "status" FROM "SandboxRideOffer" WHERE "rideId" = $1', [canceledRideId]);
+  assert.ok(canceledLedger.rows.every(row => row.status === 'DECLINED'));
+  const canceledEvents = await pool.query(
+    'SELECT "type" FROM "SandboxRideEvent" WHERE "rideId" = $1 ORDER BY "sequence"', [canceledRideId]);
+  assert.equal(canceledEvents.rows.at(-1).type, 'CANCELED');
+
 
   // A fictitious ride never inserts a real passenger Ride or dispatches drivers.
   const productionRides = await pool.query('SELECT COUNT(*)::int AS count FROM "Ride"');
@@ -260,7 +317,7 @@ try {
   assert.equal(sandboxPage.status, 200);
   assert.match(await sandboxPage.text(), /Corridas simuladas com ofertas/);
 
-  console.log('PASS: auth/partner admin review plus isolated sandbox offers, concurrent acceptance, expiry and driver release.');
+  console.log('PASS: auth, sandbox ride lifecycle, 10 simulated positions, sequential event log, concurrency, expiry and cancel.');
 } catch (error) {
   console.error(error);
   console.error('Web server logs:', logs.slice(-7000));
