@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest) {
     // Single-statement compare-and-set: prevents a second reviewer from overwriting
     // a decision. Neither user.role nor vehicle/restaurant approval is modified.
     const changed = await db().partnerApplication.updateMany({
-      where: { id: input.id, status: 'PENDING' },
+      where: { id: input.id, status: 'PENDING', userId: { not: check.userId } },
       data: { status: input.decision, reviewedAt: new Date(), reviewerId: check.userId },
     });
     if (changed.count !== 1) {
