@@ -5,7 +5,20 @@
  */
 const target = process.env.SANDBOX_MONITOR_URL;
 const token = process.env.SANDBOX_MONITOR_TOKEN;
-if (!target || !/^https?:\/\//.test(target) || !token || token.length < 32) {
+function safeMonitoringUrl(value) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ||
+      (url.protocol === 'http:' &&
+        ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  } catch {
+    return false;
+  }
+}
+if (!safeMonitoringUrl(target) || !token || token.length < 32 ||
+    (process.env.SANDBOX_ALERT_WEBHOOK_URL &&
+      !safeMonitoringUrl(process.env.SANDBOX_ALERT_WEBHOOK_URL))) {
   console.error('MONITOR_CONFIG_ERROR: target URL and 32+ character secret required');
   process.exitCode = 2;
 } else {
