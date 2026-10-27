@@ -150,3 +150,14 @@
 .sandbox-route-preview .partner-muted{margin:12px 0 0}
 @media(max-width:660px){.ops-live-switch{margin-left:0;width:100%}.sandbox-route-preview{padding:15px}.sandbox-route-stops span{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.sandbox-route-car,.sandbox-route-fill{transition:none}}
+
+/* Sprint 11 — shared SSE capacity monitoring */
+.ops-stream-health{border:1px solid #496a4d;background:#14251a;border-radius:16px;padding:19px;display:grid;gap:12px}
+.ops-stream-health-heading{display:flex;flex-wrap:wrap;justify-content:space-between;gap:9px;align-items:center}
+.ops-stream-health-heading strong{display:flex;align-items:center;gap:9px;font-size:14px;color:#e7f5e4}
+.ops-stream-health-heading svg{color:var(--lime)}
+.ops-stream-health-heading span{font-size:12px;color:#b7ccb8}
+.ops-stream-meter{height:12px;background:#304837;border:1px solid #4b6a4e;border-radius:99px;overflow:hidden}
+.ops-stream-meter>div{background:var(--lime);height:100%;border-radius:99px;transition:width .2s ease}
+.ops-stream-health p{margin:0;font-size:12px;color:#b5c8b5;line-height:1.6}
+.ops-stream-health b{color:var(--lime)}
