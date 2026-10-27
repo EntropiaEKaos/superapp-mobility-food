@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { advanceSandboxTracking, transitionSandboxJourney } from '@/lib/sandbox-journey';
+import { sandboxOperationsSnapshot } from '@/lib/sandbox-ops';
 import { authConfigured, getAuth } from '@/lib/auth';
 import { db } from '@superapp/database';
 import {
   acceptSandboxOffer, createSandboxRide,
   expireSandboxOffers, issueSandboxOffers, resetSandbox, sandboxEnabled,
-  sandboxSnapshot, seedSandbox, validLocation, SandboxConflict,
+  seedSandbox, validLocation, SandboxConflict,
 } from '@/lib/sandbox-dispatch';
 
 export const runtime = 'nodejs';
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   try {
     const denied = await authorize(req);
     if (denied) return denied;
-    return NextResponse.json(await sandboxSnapshot(), { headers: noStore });
+    return NextResponse.json(await sandboxOperationsSnapshot(), { headers: noStore });
   } catch {
     return NextResponse.json({ error: 'Laboratório indisponível.' }, { status: 503 });
   }
