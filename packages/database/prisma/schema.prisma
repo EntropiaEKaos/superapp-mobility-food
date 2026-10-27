@@ -25,6 +25,18 @@ enum RideStatus {
   CANCELED
 }
 
+enum PartnerKind {
+  DRIVER
+  COURIER
+  RESTAURANT
+}
+
+enum PartnerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum FoodOrderStatus {
   CREATED
   ACCEPTED
@@ -51,6 +63,7 @@ model User {
   ridesAsDriver Ride[]   @relation("RideDriver")
   restaurants   Restaurant[]
   foodOrders    FoodOrder[]
+  partnerApplications PartnerApplication[]
   vehicles      Vehicle[]
   @@map("users")
 }
@@ -185,4 +198,19 @@ model FoodOrderItem {
   quantity   Int
   unitCents  Int
   @@index([orderId])
+}
+
+model PartnerApplication {
+  id          String                   @id @default(cuid())
+  userId      String
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        PartnerKind
+  status      PartnerApplicationStatus @default(PENDING)
+  displayName String
+  city        String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@unique([userId, kind])
+  @@index([status, createdAt])
 }
