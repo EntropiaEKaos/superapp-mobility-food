@@ -4,6 +4,7 @@ import { authConfigured, getAuth } from '@/lib/auth';
 import { db } from '@superapp/database';
 import { sandboxEnabled } from '@/lib/sandbox-dispatch';
 import { sandboxOperationsSnapshot } from '@/lib/sandbox-ops';
+import { acquireSandboxStreamSlot } from '@/lib/sandbox-stream-capacity';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
   if (!sandboxEnabled() || !authConfigured()) {
     return NextResponse.json({ error: 'Laboratório desabilitado.' }, { status: 503 });
   }
+  let authenticatedAdminId = '';
   try {
     const session = await getAuth().api.getSession({ headers: req.headers });
     if (!session) return NextResponse.json({ error: 'Login necessário.' }, { status: 401 });
@@ -27,6 +29,7 @@ export async function GET(req: NextRequest) {
     if (profile?.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Acesso reservado ao administrador.' }, { status: 403 });
     }
+    authenticatedAdminId = session.user.id;
   } catch {
     return NextResponse.json({ error: 'Falha ao validar acesso.' }, { status: 503 });
   }
@@ -38,6 +41,19 @@ export async function GET(req: NextRequest) {
   });
   try {
     await client.connect();
+    const admission = await acquireSandboxStreamSlot(client, authenticatedAdminId);
+    if (admission !== 'accepted') {
+      await client.end().catch(() => undefined); // release user lock if any
+      return NextResponse.json({
+        error: admission === 'user_busy'
+          ? 'Já existe uma transmissão ativa para este administrador.'
+          : 'Limite de transmissões do laboratório atingido.',
+        code: admission,
+      }, {
+        status: 429,
+        headers: { 'Retry-After': '30', 'Cache-Control': 'private, no-store' },
+      });
+    }
     await client.query('LISTEN superapp_sandbox_changed');
   } catch {
     await client.end().catch(() => undefined);
