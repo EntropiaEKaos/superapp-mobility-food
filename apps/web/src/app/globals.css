@@ -27,3 +27,16 @@
 .cart-note svg{flex-shrink:0}
 @media(max-width:900px){.menu-layout{grid-template-columns:1fr}.demo-cart{position:static}}
 @media(max-width:640px){.menu-item{align-items:flex-start;padding:16px;gap:12px}.menu-emoji{font-size:36px}.demo-cart{padding:20px}}
+
+/* Partner applications: onboarding is deliberately non-operational until reviewed. */
+.partner-cta{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-top:30px}
+.partner-cta p,.partner-muted{color:#a8b9ab;font-size:13px;line-height:1.7}
+.partner-application-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,1fr);gap:24px;align-items:start}
+.partner-application-layout .auth-form select{width:100%;padding:15px;background:#0d1710;border:1px solid #536555;color:#eef7ed;border-radius:11px;outline:none}
+.partner-success{padding:13px;border:1px solid #4e7e54;background:#1d452c;color:#daf7db;border-radius:11px;font-size:13px;line-height:1.6}
+.partner-applications{display:grid;gap:12px;margin:24px 0}
+.partner-applications article{display:flex;flex-direction:column;gap:8px;padding:16px;background:#102018;border:1px solid #395042;border-radius:12px}
+.partner-applications article strong{font-size:16px}
+.partner-applications article span{font-size:13px;color:#b4c3b7}
+.partner-applications article small{font-size:12px;color:var(--lime)}
+@media(max-width:900px){.partner-application-layout{grid-template-columns:1fr}}

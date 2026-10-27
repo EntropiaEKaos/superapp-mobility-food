@@ -79,7 +79,47 @@ try {
   assert.equal(admin.status, 200);
   assert.match(await admin.text(), /Acesso restrito/, 'customer account must not access admin');
 
-  console.log('PASS: initial migration, sign-up, PostgreSQL persistence, session and ADMIN deny.');
+  // Pending applications are always bound to the signed-in user's session.
+  const anonymousApplications = await request('/api/partners/applications');
+  assert.equal(anonymousApplications.status, 401, 'anonymous users cannot list applications');
+
+  const invalidApplication = await request('/api/partners/applications', {
+    method: 'POST',
+    headers: { Cookie: cookies, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'ADMIN', displayName: 'Bad role', city: 'Praia Grande' }),
+  });
+  assert.equal(invalidApplication.status, 422, 'partner kind must be whitelisted');
+
+  const apply = await request('/api/partners/applications', {
+    method: 'POST',
+    headers: { Cookie: cookies, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'DRIVER', displayName: 'CI Motorista', city: 'Praia Grande' }),
+  });
+  const applyBody = await apply.text();
+  assert.equal(apply.status, 201, 'first application accepted: ' + applyBody.slice(0, 400));
+  const created = JSON.parse(applyBody);
+  assert.equal(created.application.status, 'PENDING', 'application never starts approved');
+
+  const duplicate = await request('/api/partners/applications', {
+    method: 'POST',
+    headers: { Cookie: cookies, Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'DRIVER', displayName: 'Duplicado', city: 'Praia Grande' }),
+  });
+  assert.equal(duplicate.status, 409, 'one request per user per kind is enforced by PostgreSQL');
+
+  const mine = await request('/api/partners/applications', { headers: { Cookie: cookies, Origin: origin } });
+  assert.equal(mine.status, 200);
+  const mineBody = await mine.json();
+  assert.equal(mineBody.applications.length, 1);
+  assert.equal(mineBody.applications[0].kind, 'DRIVER');
+
+  const updatedRoles = await pool.query('SELECT "role" FROM "users" WHERE "email" = $1', [email]);
+  assert.equal(updatedRoles.rows[0].role, 'CUSTOMER', 'applicant cannot self-promote to professional roles');
+  const onboardingPage = await request('/partners/apply', { headers: { Cookie: cookies, Origin: origin } });
+  assert.equal(onboardingPage.status, 200);
+  assert.match(await onboardingPage.text(), /CI Motorista/);
+
+  console.log('PASS: migrations, sign-up, sessions, admin deny, pending partner application, ownership and uniqueness.');
 } catch (error) {
   console.error(error);
   console.error('Web server logs:', logs.slice(-7000));
