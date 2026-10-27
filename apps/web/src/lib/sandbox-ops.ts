@@ -111,14 +111,14 @@ export async function sandboxOperationsSnapshot() {
       select: { createdAt: true },
     }),
   ]);
-  const [deadSamples, lastPublished, workerStats] = await Promise.all([
+  const [deadSamples, lastPublished, workerStats, publishedLastMinute] = await Promise.all([
     db().sandboxEventOutbox.findMany({
       where: { status: 'DEAD' }, orderBy: { createdAt: 'asc' }, take: 5,
       select: { id: true, attempts: true, lastErrorCode: true, createdAt: true },
     }),
     db().sandboxEventOutbox.findMany({
       where: { status: 'PUBLISHED', publishedAt: { not: null } },
-      orderBy: { publishedAt: 'desc' }, take: 50,
+      orderBy: { publishedAt: 'desc' }, take: 100,
       select: { createdAt: true, publishedAt: true },
     }),
     db().$queryRaw<Array<{ active: number }>>`
@@ -126,11 +126,19 @@ export async function sandboxOperationsSnapshot() {
       WHERE datname = current_database()
         AND application_name = 'superapp-sandbox-outbox-worker'
     `,
+    db().sandboxEventOutbox.count({
+      where: { status: 'PUBLISHED',
+        publishedAt: { gte: new Date(now.getTime() - 60_000) } },
+    }),
   ]);
-  const averagePublishLagSeconds = lastPublished.length
-    ? Math.round(lastPublished.reduce((sum, row) =>
-        sum + Math.max(0, (row.publishedAt!.getTime() - row.createdAt.getTime()) / 1000), 0
-      ) / lastPublished.length)
+  const lagSeconds = lastPublished.map(row => Math.max(0,
+    (row.publishedAt!.getTime() - row.createdAt.getTime()) / 1000
+  )).sort((a, b) => a - b);
+  const averagePublishLagSeconds = lagSeconds.length
+    ? Math.round(lagSeconds.reduce((sum, lag) => sum + lag, 0) / lagSeconds.length * 10) / 10
+    : null;
+  const lagPercentile = (fraction: number) => lagSeconds.length
+    ? Math.round(lagSeconds[Math.ceil(lagSeconds.length * fraction) - 1] * 10) / 10
     : null;
   const outboxHealth = {
     pending: pendingOutbox,
@@ -156,7 +164,14 @@ export async function sandboxOperationsSnapshot() {
     streamHealth,
     outboxHealth,
     deadSamples: deadSamples.map(row => ({ ...row, id: row.id.toString() })),
-    workerHealth: { activeConnections: workerStats[0]?.active ?? 0, averagePublishLagSeconds, sampleSize: lastPublished.length },
+    workerHealth: {
+      activeConnections: workerStats[0]?.active ?? 0,
+      averagePublishLagSeconds,
+      p50PublishLagSeconds: lagPercentile(0.5),
+      p95PublishLagSeconds: lagPercentile(0.95),
+      publishedLastMinute,
+      sampleSize: lastPublished.length,
+    },
     recentLimit: 20,
     metrics: {
       ridesByStatus: counts,
