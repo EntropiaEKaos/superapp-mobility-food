@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
         result = await acceptSandboxOffer(input.offerId); break;
       case 'expire':
         if (typeof input.rideId !== 'string' ||
-          (input.advanceSeconds !== undefined && (!Number.isInteger(input.advanceSeconds) ||
-          (input.advanceSeconds as number) < 0 || (input.advanceSeconds as number) > 120))) {
+          (input.advanceSeconds !== undefined && (typeof input.advanceSeconds !== 'number' ||
+          !Number.isInteger(input.advanceSeconds) || input.advanceSeconds < 0 || input.advanceSeconds > 120))) {
           return NextResponse.json({ error: 'Expiração inválida.' }, { status: 422 });
         }
         result = await expireSandboxOffers(input.rideId, typeof input.advanceSeconds === 'number' ? input.advanceSeconds : 0); break;
