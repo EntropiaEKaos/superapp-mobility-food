@@ -214,9 +214,90 @@ try {
   assert.equal((await sandboxCall(adminCookie, { action: 'reset' })).status, 200);
   const seeded = await sandboxCall(adminCookie, { action: 'seed' });
   assert.equal(seeded.status, 200);
+  // Sprint 10: SSE stream must be protected and receive PostgreSQL notifications
+  // without creating a record of its own. A new connection begins with a full snapshot.
+  const streamPath = '/api/admin/sandbox-rides/stream';
+  assert.equal((await request(streamPath)).status, 401);
+  assert.equal((await request(streamPath, { headers: { Cookie: cookies } })).status, 403);
+  const streamAbort = new AbortController();
+  const streamResponse = await fetch(origin + streamPath, {
+    headers: { Cookie: adminCookie },
+    signal: streamAbort.signal,
+  });
+  assert.equal(streamResponse.status, 200);
+  assert.match(streamResponse.headers.get('content-type') ?? '', /text\/event-stream/);
+  assert.match(streamResponse.headers.get('cache-control') ?? '', /no-store/);
+  const reader = streamResponse.body.getReader();
+  const decoder = new TextDecoder();
+  let frames = '';
+  async function readSnapshotFromStream() {
+    for (let attempts = 0; attempts < 100; attempts++) {
+      let separator = frames.indexOf('\n\n');
+      while (separator >= 0) {
+        const message = frames.slice(0, separator);
+        frames = frames.slice(separator + 2);
+        if (message.includes('event: snapshot')) {
+          const data = message.split('\n').find(line => line.startsWith('data: '));
+          assert.ok(data, 'event snapshot must contain data');
+          return JSON.parse(data.slice(6));
+        }
+        separator = frames.indexOf('\n\n');
+      }
+      const chunk = await Promise.race([
+        reader.read(),
+        sleep(9000).then(() => { throw new Error('SSE packet timeout'); }),
+      ]);
+      assert.equal(chunk.done, false, 'SSE stream should remain open during the test');
+      frames += decoder.decode(chunk.value, { stream: true });
+    }
+    throw new Error('No SSE snapshot received');
+  }
+  const firstStreamSnapshot = await readSnapshotFromStream();
+  assert.equal(firstStreamSnapshot.demo, true);
+  assert.equal(firstStreamSnapshot.metrics.totalRides, 0);
+
   const createdRide = await sandboxCall(adminCookie, { action: 'create', origin: 'boqueirao', destination: 'ocian' });
   assert.equal(createdRide.status, 200);
   const rideId = (await createdRide.json()).result.id;
+  const liveSnapshot = await readSnapshotFromStream();
+  assert.equal(liveSnapshot.metrics.totalRides, firstStreamSnapshot.metrics.totalRides + 1,
+    'PostgreSQL NOTIFY must push the new ride without client polling');
+  await reader.cancel();
+  streamAbort.abort();
+
+  // Reconnect must start with a fresh full snapshot (no unsafe incremental replay).
+  const reconnectAbort = new AbortController();
+  const reconnect = await fetch(origin + streamPath, {
+    headers: { Cookie: adminCookie }, signal: reconnectAbort.signal,
+  });
+  assert.equal(reconnect.status, 200);
+  const reconnectReader = reconnect.body.getReader();
+  let reconnectFrames = '';
+  let reconnectSnapshot = null;
+  const reconnectDecoder = new TextDecoder();
+  while (!reconnectSnapshot) {
+    const packet = await Promise.race([
+      reconnectReader.read(),
+      sleep(9000).then(() => { throw new Error('Reconnect snapshot timeout'); }),
+    ]);
+    assert.equal(packet.done, false);
+    reconnectFrames += reconnectDecoder.decode(packet.value, { stream: true });
+    let boundary = reconnectFrames.indexOf('\n\n');
+    while (boundary >= 0) {
+      const message = reconnectFrames.slice(0, boundary);
+      reconnectFrames = reconnectFrames.slice(boundary + 2);
+      if (message.includes('event: snapshot')) {
+        const data = message.split('\n').find(line => line.startsWith('data: '));
+        reconnectSnapshot = JSON.parse(data.slice(6));
+        break;
+      }
+      boundary = reconnectFrames.indexOf('\n\n');
+    }
+  }
+  assert.equal(reconnectSnapshot.metrics.totalRides, 1);
+  await reconnectReader.cancel();
+  reconnectAbort.abort();
+
   const offerResponse = await sandboxCall(adminCookie, { action: 'offer', rideId });
   assert.equal(offerResponse.status, 200);
   const offered = (await offerResponse.json()).result;
@@ -380,7 +461,7 @@ try {
 
 
 
-  console.log('PASS: auth, sandbox ride lifecycle, 10 simulated positions, sequential event log, concurrency, expiry and cancel.');
+  console.log('PASS: auth, PostgreSQL SSE streaming and reconnect, ride lifecycle, event log, concurrency and expiry.');
 } catch (error) {
   console.error(error);
   console.error('Web server logs:', logs.slice(-7000));
