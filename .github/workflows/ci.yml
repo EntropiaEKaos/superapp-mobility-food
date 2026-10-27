@@ -189,3 +189,40 @@ jobs:
           path: artifacts/homologation/
           if-no-files-found: warn
           retention-days: 14
+
+
+  visual-browser:
+    name: Chromium — desktop/mobile visual QA
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Install headless Chromium and system libraries
+        run: npx playwright install --with-deps chromium
+      - name: Build isolated demo (sandbox and authentication disabled)
+        env:
+          DATABASE_URL: ''
+          BETTER_AUTH_SECRET: ''
+          ENABLE_SANDBOX_DISPATCH: 'false'
+        run: npm run build
+      - name: Run real-browser desktop/mobile journeys
+        env:
+          DATABASE_URL: ''
+          BETTER_AUTH_SECRET: ''
+          ENABLE_SANDBOX_DISPATCH: 'false'
+        run: node scripts/visual-browser-smoke.mjs
+      - name: Upload screenshots and QA reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint19-browser-screenshots
+          path: artifacts/visual-sprint19/
+          if-no-files-found: warn
+          retention-days: 14
