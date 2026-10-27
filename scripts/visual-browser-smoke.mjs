@@ -114,7 +114,15 @@ async function checkPublicPages(context, device) {
       }));
       assert.equal(first.tag, 'A');
       assert.ok(first.href, 'first focus must be actionable link');
-      await page.keyboard.press('Tab');
+      // Mobile nav hides different links: follow focus until a real /rides link
+      // instead of assuming a fixed tab index across responsive layouts.
+      let focusedRide = false;
+      for (let tabIndex = 0; tabIndex < 16; tabIndex++) {
+        const target = await page.evaluate(() => document.activeElement?.getAttribute('href'));
+        if (target === '/rides') { focusedRide = true; break; }
+        await page.keyboard.press('Tab');
+      }
+      assert.equal(focusedRide, true, 'a ride navigation link must be keyboard reachable');
       await page.keyboard.press('Enter');
       await page.waitForURL(url => url.pathname === '/rides');
       const focused = await page.locator('#origin').getAttribute('id');
