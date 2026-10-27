@@ -25,3 +25,5 @@ jobs:
         env:
           DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
           BETTER_AUTH_SECRET: placeholder-only-for-ci-32-chars-xx
+      - name: Smoke test (demo mode, no payments or database)
+        run: node scripts/smoke.mjs
