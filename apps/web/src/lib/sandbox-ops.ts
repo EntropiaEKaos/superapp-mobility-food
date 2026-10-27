@@ -94,6 +94,22 @@ export async function sandboxOperationsSnapshot() {
       status, statusGroups.find(group => group.status === status)?._count._all ?? 0,
     ]),
   ) as Record<SandboxStatus, number>;
+  const [pendingOutbox, publishedOutbox, oldestPending] = await Promise.all([
+    db().sandboxEventOutbox.count({ where: { status: 'PENDING' } }),
+    db().sandboxEventOutbox.count({ where: { status: 'PUBLISHED' } }),
+    db().sandboxEventOutbox.findFirst({
+      where: { status: 'PENDING' }, orderBy: { id: 'asc' },
+      select: { createdAt: true },
+    }),
+  ]);
+  const outboxHealth = {
+    pending: pendingOutbox,
+    published: publishedOutbox,
+    oldestPendingAgeSeconds: oldestPending
+      ? Math.max(0, Math.floor((now.getTime() - oldestPending.createdAt.getTime()) / 1000))
+      : null,
+    deliveryGuarantee: 'at-least-once-to-broker' as const,
+  };
   const totalRides = Object.values(counts).reduce((sum, quantity) => sum + quantity, 0);
   const streamHealth = process.env.SANDBOX_EVENT_TRANSPORT === 'redis'
     ? await getRedisSandboxStreamHealth()
@@ -103,6 +119,7 @@ export async function sandboxOperationsSnapshot() {
     ...snapshot,
     generatedAt: now.toISOString(),
     streamHealth,
+    outboxHealth,
     recentLimit: 20,
     metrics: {
       ridesByStatus: counts,
