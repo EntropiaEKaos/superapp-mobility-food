@@ -41,6 +41,15 @@ npm run build
 
 O repositório oficial é [EntropiaEKaos/superapp-mobility-food](https://github.com/EntropiaEKaos/superapp-mobility-food). O código da Sprint 01 já está na branch `main`; propostas novas entram por Pull Request com CI. Nunca envie credenciais, arquivos `.env`, tokens ou dados reais.\n\nExecute `npm install` antes de fazer o primeiro commit para gerar `package-lock.json` e incluí-lo no Git. Enquanto não existir lockfile, o CI faz `npm install`; quando existir, faz `npm ci` para builds reproduzíveis. **Sem acesso ao registro npm neste ambiente, o lockfile e as migrações ainda não foram gerados; são passos obrigatórios antes da produção.**
 
+## Sprint 03 e 04 — banco, login e solicitações de parceria
+
+- **Sprint 03:** migrações SQL iniciais versionadas em `packages/database/prisma/migrations` e teste real com PostgreSQL 16 no GitHub Actions. Cadastro Better Auth, sessão persistida e restrição de administrador validados contra um banco temporário.
+- **Sprint 04:** tela `/partners/apply` para **solicitar** cadastro de motorista, entregador ou restaurante (somente usuário autenticado). As solicitações são vinculadas ao dono, com status `PENDING`, limite de uma por modalidade e sem promoção automática de permissões.
+- `GET /api/partners/applications` lista **somente** inscrições da conta logada; `POST /api/partners/applications` valida dados e registra uma solicitação pendente.
+- Nenhum motorista ou restaurante entra em operação por este cadastro; antes do lançamento serão exigidos aprovação administrativa, documentos, conformidade legal e controles antiabuso.
+
+**Produção:** aplique migrações apenas via release controlado e use `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` e `NEXT_PUBLIC_APP_URL` no ambiente de deploy. O README descreve demonstração; os testes usam apenas banco temporário e identidades fictícias.
+
 ## Sprint 02 — demonstração interativa
 
 - Cardápio com controles de quantidade, carrinho local e subtotal. Sem envio de pedidos ou pagamentos.
