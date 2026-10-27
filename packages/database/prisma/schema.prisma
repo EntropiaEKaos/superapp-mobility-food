@@ -219,3 +219,68 @@ model PartnerApplication {
   @@index([status, createdAt])
   @@index([reviewerId])
 }
+
+
+enum SandboxRideStatus {
+  REQUESTED
+  OFFERED
+  ACCEPTED
+  EXPIRED
+  COMPLETED
+  CANCELED
+}
+
+enum SandboxOfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model SandboxDriver {
+  id           String             @id
+  label        String
+  lat          Float
+  lng          Float
+  active       Boolean            @default(true)
+  busy         Boolean            @default(false)
+  lastSeenAt   DateTime
+  createdAt    DateTime           @default(now())
+  offers       SandboxRideOffer[]
+  acceptedRides SandboxRide[]     @relation("SandboxWinner")
+
+  @@index([active, busy, lastSeenAt])
+}
+
+model SandboxRide {
+  id               String             @id @default(cuid())
+  pickupLabel      String
+  dropoffLabel     String
+  pickupLat        Float
+  pickupLng        Float
+  status           SandboxRideStatus  @default(REQUESTED)
+  acceptedDriverId String?
+  acceptedDriver   SandboxDriver?     @relation("SandboxWinner", fields: [acceptedDriverId], references: [id], onDelete: SetNull)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  offers           SandboxRideOffer[]
+
+  @@index([status, createdAt])
+  @@index([acceptedDriverId])
+}
+
+model SandboxRideOffer {
+  id        String             @id @default(cuid())
+  rideId    String
+  ride      SandboxRide        @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  driverId  String
+  driver    SandboxDriver      @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  status    SandboxOfferStatus @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([rideId, driverId])
+  @@index([rideId, status, expiresAt])
+  @@index([driverId, status])
+}
