@@ -461,7 +461,89 @@ try {
 
 
 
-  console.log('PASS: auth, PostgreSQL SSE streaming and reconnect, ride lifecycle, event log, concurrency and expiry.');
+  // Sprint 11: capacity is shared through PostgreSQL session advisory locks.
+  // Register fake admins to simulate different administrators sharing one database.
+  const sockets = [];
+  const streamTestUsers = [];
+  async function streamFor(cookie) {
+    const controller = new AbortController();
+    const response = await fetch(origin + streamPath, {
+      headers: { Cookie: cookie }, signal: controller.signal,
+    });
+    if (response.status !== 200) {
+      controller.abort();
+      return { response, controller: null };
+    }
+    sockets.push(controller);
+    return { response, controller };
+  }
+  try {
+    const firstAdminStream = await streamFor(adminCookie);
+    assert.equal(firstAdminStream.response.status, 200);
+    const sameAdminStream = await streamFor(adminCookie);
+    assert.equal(sameAdminStream.response.status, 429, 'only one active stream per admin');
+    assert.equal((await sameAdminStream.response.json()).code, 'user_busy');
+    assert.equal(sameAdminStream.response.headers.get('retry-after'), '30');
+
+    for (let i = 1; i < 8; i++) {
+      const nextEmail = `sse-admin-${process.pid}-${i}@example.invalid`;
+      const createdAccount = await request('/api/auth/sign-up/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: origin },
+        body: JSON.stringify({ name: `CI Stream Admin ${i}`, email: nextEmail, password }),
+      });
+      assert.equal(createdAccount.status, 200, 'fake admin account registered');
+      const nextCookie = createdAccount.headers.getSetCookie().map(v => v.split(';')[0]).join('; ');
+      assert.ok(nextCookie);
+      await pool.query('UPDATE "users" SET "role" = $1 WHERE "email" = $2', ['ADMIN', nextEmail]);
+      streamTestUsers.push(nextCookie);
+      const open = await streamFor(nextCookie);
+      assert.equal(open.response.status, 200, `SSE stream ${i} of eight must be admitted`);
+    }
+
+    const health = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+    assert.equal(health.status, 200);
+    const healthBody = await health.json();
+    assert.equal(healthBody.streamHealth.capacity, 8);
+    assert.equal(healthBody.streamHealth.activeConnections, 8);
+    assert.equal(healthBody.streamHealth.availableSlots, 0);
+    assert.equal(healthBody.streamHealth.utilizationPercent, 100);
+
+    const lastEmail = `sse-admin-${process.pid}-overflow@example.invalid`;
+    const lastRegister = await request('/api/auth/sign-up/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: origin },
+      body: JSON.stringify({ name: 'CI Overflow Admin', email: lastEmail, password }),
+    });
+    assert.equal(lastRegister.status, 200);
+    const lastCookie = lastRegister.headers.getSetCookie().map(v => v.split(';')[0]).join('; ');
+    await pool.query('UPDATE "users" SET "role" = $1 WHERE "email" = $2', ['ADMIN', lastEmail]);
+    const ninth = await streamFor(lastCookie);
+    assert.equal(ninth.response.status, 429, 'ninth admin cannot consume a ninth DB connection');
+    assert.equal((await ninth.response.json()).code, 'capacity_reached');
+
+    sockets[0].abort();
+    for (let i = 0; i < 40; i++) {
+      const state = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+      const data = await state.json();
+      if (data.streamHealth.activeConnections === 7) break;
+      await sleep(100);
+    }
+    const reopened = await streamFor(lastCookie);
+    assert.equal(reopened.response.status, 200, 'capacity must be released when an SSE client disconnects');
+    const finalHealth = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+    const finalState = await finalHealth.json();
+    assert.equal(finalState.streamHealth.activeConnections, 8, 'all eight stream slots reused safely');
+    assert.equal(finalState.streamHealth.availableSlots, 0);
+  } finally {
+    for (const socket of sockets) socket.abort();
+  }
+  const finalOperations = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(finalOperations.status, 200);
+  assert.match(await finalOperations.text(), /Conexões em tempo real/);
+
+  console.log('PASS: auth, SSE notify/reconnect, eight global slots, admin uniqueness, capacity release and ride concurrency.');
+
 } catch (error) {
   console.error(error);
   console.error('Web server logs:', logs.slice(-7000));
