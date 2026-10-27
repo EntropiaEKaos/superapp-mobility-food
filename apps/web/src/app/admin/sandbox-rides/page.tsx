@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { authConfigured, getAuth } from '@/lib/auth';
 import { db } from '@superapp/database';
-import { sandboxEnabled, sandboxSnapshot } from '@/lib/sandbox-dispatch';
+import { sandboxEnabled } from '@/lib/sandbox-dispatch';
+import { sandboxOperationsSnapshot } from '@/lib/sandbox-ops';
 import { SandboxRidesConsole } from '@/components/sandbox-rides-console';
 
 export const dynamic = 'force-dynamic';
@@ -19,11 +20,11 @@ export default async function SandboxRidesPage() {
   return <main className="wrap interior">
     <Link className="back" href="/admin"><ArrowLeft size={16}/> Administração</Link>
     <div className="page-heading">
-      <div className="eyebrow muted">SPRINT 06 · LABORATÓRIO RESTRITO</div>
-      <h1>Corridas simuladas com ofertas</h1>
-      <p>Experimente ofertas de 30 segundos, aceite único, expiração e conclusão usando apenas veículos fictícios.</p>
+      <div className="eyebrow muted">SPRINT 08 · CENTRAL DE OPERAÇÕES</div>
+      <h1>Central de operações simuladas</h1>
+      <p>Acompanhe corridas fictícias, indicadores globais, eventos recentes e diagnósticos do laboratório. Sem corridas ou GPS reais.</p>
     </div>
     {!sandboxEnabled() ? <div className="notice"><ShieldCheck size={17}/> Recurso desligado por padrão. Use ENABLE_SANDBOX_DISPATCH=true apenas no ambiente isolado de desenvolvimento.</div>
-      : <SandboxRidesConsole initial={JSON.parse(JSON.stringify(await sandboxSnapshot()))}/>}
+      : <SandboxRidesConsole initial={JSON.parse(JSON.stringify(await sandboxOperationsSnapshot()))}/>}
   </main>;
 }
