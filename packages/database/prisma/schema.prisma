@@ -348,3 +348,14 @@ model SandboxEventOutbox {
   @@index([status, nextAttemptAt, id])
   @@index([createdAt])
 }
+
+/** Every manual resurrection of a failed sandbox notification is attributed. */
+model SandboxOutboxRequeueAudit {
+  id          String   @id @default(cuid())
+  outboxId    BigInt
+  actorUserId String
+  createdAt   DateTime @default(now())
+
+  @@index([outboxId, createdAt])
+  @@index([actorUserId, createdAt])
+}

@@ -5,6 +5,7 @@ import { useSandboxOpsFeed } from '@/hooks/use-sandbox-ops-feed';
 import { CarFront, Clock3, CircleCheck, CircleX, RotateCw } from 'lucide-react';
 import { SandboxOperationsOverview, type SandboxOpsTelemetry } from './sandbox-operations-overview';
 import { SandboxRoutePreview } from './sandbox-route-preview';
+import { SandboxOutboxRecovery } from './sandbox-outbox-recovery';
 
 type Offer = {
   id: string;
@@ -109,6 +110,7 @@ export function SandboxRidesConsole({ initial }: { initial: SandboxSnapshot }) {
       </label>
     </div>
     <SandboxOperationsOverview snapshot={snapshot} onRefresh={() => { void updateManually(); }} refreshing={working}/>
+    <SandboxOutboxRecovery notices={snapshot.deadSamples} onRequeued={refresh}/>
     <section className="panel">
       <h2><CarFront size={22}/> Laboratório de ofertas</h2>
       <p className="partner-muted">Dados fictícios em PostgreSQL. Não conecta passageiros, motoristas ou pagamentos reais.</p>

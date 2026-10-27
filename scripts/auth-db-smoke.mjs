@@ -209,6 +209,48 @@ try {
   assert.equal(sandboxAnonymous.status, 401, 'anonymous cannot inspect simulated rides');
   const sandboxCustomer = await request(sandboxPath, { headers: { Cookie: cookies, Origin: origin } });
   assert.equal(sandboxCustomer.status, 403, 'customers cannot access sandbox');
+  // Sprint 15: dead-letter requeue is strictly limited to ADMIN + same Origin,
+  // requires explicit confirmation, and writes an immutable audit row.
+  const requeueUrl = '/api/admin/sandbox-outbox/requeue';
+  const deadFixture = await pool.query(`
+    INSERT INTO "SandboxEventOutbox"
+      ("sourceTable", "operation", "status", "attempts", "lastErrorCode")
+    VALUES ('SandboxDriver', 'UPDATE', 'DEAD', 5, 'REDIS_PUBLISH_FAILED')
+    RETURNING "id"
+  `);
+  const deadId = String(deadFixture.rows[0].id);
+  const requeue = (cookie, confirmation = 'REQUEUE', requestOrigin = origin) => request(requeueUrl, {
+    method: 'POST', headers: { Cookie: cookie, Origin: requestOrigin,
+      'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: deadId, confirmation }),
+  });
+  const anonRequeue = await request(requeueUrl, {
+    method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: deadId, confirmation: 'REQUEUE' }),
+  });
+  assert.equal(anonRequeue.status, 401);
+  assert.equal((await requeue(cookies)).status, 403, 'customer cannot resurrect dead events');
+  assert.equal((await requeue(adminCookie, 'REQUEUE', 'https://invalid.example')).status, 403);
+  assert.equal((await requeue(adminCookie, 'INVALID')).status, 422);
+  const beforeRecovery = await request(sandboxPath, { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(beforeRecovery.status, 200);
+  const observed = await beforeRecovery.json();
+  assert.ok(observed.deadSamples.some(row => row.id === deadId));
+  assert.ok(observed.outboxHealth.dead >= 1);
+  const successfulRequeue = await requeue(adminCookie);
+  assert.equal(successfulRequeue.status, 200);
+  assert.equal((await requeue(adminCookie)).status, 409, 'requeue is single-use without a new failure');
+  const noticeLedger = await pool.query(
+    'SELECT "status", "attempts", "lastErrorCode" FROM "SandboxEventOutbox" WHERE "id"=$1', [deadId]);
+  assert.equal(noticeLedger.rows[0].status, 'PENDING');
+  assert.equal(noticeLedger.rows[0].attempts, 0);
+  assert.equal(noticeLedger.rows[0].lastErrorCode, null);
+  const reviewLedger = await pool.query(
+    'SELECT "actorUserId" FROM "SandboxOutboxRequeueAudit" WHERE "outboxId"=$1', [deadId]);
+  assert.equal(reviewLedger.rowCount, 1);
+  const adminIdentity = await pool.query('SELECT "id" FROM "users" WHERE "email"=$1', [adminEmail]);
+  assert.equal(reviewLedger.rows[0].actorUserId, adminIdentity.rows[0].id);
+
   const crossOrigin = await sandboxCall(adminCookie, { action: 'seed' }, { Origin: 'https://forged.invalid' });
   assert.equal(crossOrigin.status, 403, 'admin sandbox mutation requires matching Origin');
   assert.equal((await sandboxCall(adminCookie, { action: 'reset' })).status, 200);

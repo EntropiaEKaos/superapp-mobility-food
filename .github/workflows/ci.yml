@@ -27,6 +27,8 @@ jobs:
           BETTER_AUTH_SECRET: placeholder-only-for-ci-32-chars-xx
       - name: Smoke test (demo mode, no payments or database)
         run: node scripts/smoke.mjs
+      - name: Supervisor crash/restart/shutdown smoke
+        run: node scripts/supervisor-smoke.mjs
 
   postgres-integration:
     name: PostgreSQL + Auth integration
