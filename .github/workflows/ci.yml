@@ -118,3 +118,5 @@ jobs:
         run: npm run build
       - name: Verify PostgreSQL bridge, Redis PubSub, SSE reconnect and capacity
         run: node scripts/redis-bridge-smoke.mjs
+      - name: Verify durable outbox, rollback isolation and broker recovery
+        run: node scripts/outbox-recovery-smoke.mjs
