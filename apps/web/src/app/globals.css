@@ -170,3 +170,14 @@
 .ops-outbox-stats strong{font-size:23px;color:#e7f5e4;overflow-wrap:anywhere}
 .ops-outbox-health p{margin:0;font-size:12px;line-height:1.6;color:#b6c9b6}
 @media(max-width:650px){.ops-outbox-stats{grid-template-columns:1fr 1fr}.ops-outbox-stats span:last-child{grid-column:span 2}}
+
+/* Sprint 15: audited notice recovery */
+.sandbox-outbox-entry{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:13px 0;border-top:1px solid #425945}
+.sandbox-outbox-entry>div{display:grid;gap:6px}
+.sandbox-outbox-entry strong{font-size:13px}
+.sandbox-outbox-entry small{font-size:11px;color:#bdcdbb}
+.sandbox-outbox-confirm{margin-top:15px;border:1px solid #6c7750;background:#182b1e;border-radius:12px;padding:15px;display:grid;gap:12px}
+.sandbox-outbox-confirm p{font-size:12px;color:#d4e4cd;line-height:1.7;margin:0}
+.sandbox-outbox-confirm label{display:grid;gap:8px;font-size:12px;font-weight:800}
+.sandbox-outbox-confirm input{width:min(100%,320px);background:#0a1a10;color:#f6fdf3;border:1px solid #658565;border-radius:10px;padding:11px}
+.sandbox-outbox-actions{display:flex;gap:10px;flex-wrap:wrap}
