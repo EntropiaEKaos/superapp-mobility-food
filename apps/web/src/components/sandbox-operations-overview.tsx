@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, CarFront, CheckCircle2, Clock3, Gauge, Refresh
 export type SandboxOpsTelemetry = {
   generatedAt: string;
   recentLimit: number;
+  streamHealth: { activeConnections: number; capacity: number; availableSlots: number; utilizationPercent: number };
   metrics: {
     totalRides: number;
     activeRides: number;
@@ -96,6 +97,19 @@ export function SandboxOperationsOverview({
       <span>Ofertas pendentes: <b>{m.pendingOffers}</b></span>
       <span>Eventos registrados: <b>{m.eventCount}</b></span>
     </div>
+    <section className="ops-stream-health" aria-label="Saúde das transmissões">
+      <div className="ops-stream-health-heading">
+        <strong><Activity size={18}/> Conexões em tempo real</strong>
+        <span>{snapshot.streamHealth.activeConnections} de {snapshot.streamHealth.capacity} canais SSE ativos</span>
+      </div>
+      <div className="ops-stream-meter" role="progressbar"
+        aria-label="Utilização de conexões SSE" aria-valuenow={snapshot.streamHealth.activeConnections}
+        aria-valuemin={0} aria-valuemax={snapshot.streamHealth.capacity}>
+        <div style={{ width: `${Math.min(100, snapshot.streamHealth.utilizationPercent)}%` }}/>
+      </div>
+      <p>Capacidade disponível: <b>{snapshot.streamHealth.availableSlots}</b> · Máximo de uma conexão por administrador.
+        Quando o limite é atingido, o painel pode usar consultas periódicas como alternativa.</p>
+    </section>
     <div className="ops-columns">
       <section className="panel">
         <h3>Estados das corridas</h3>
