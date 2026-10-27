@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { createClient } from 'redis';
+import { nextBrokerCircuit } from './lib/sandbox-broker-circuit.mjs';
 
 /**
  * Sandbox-only PostgreSQL outbox → Redis relay.
@@ -27,6 +28,7 @@ let draining = false;
 let wakeAgain = false;
 let timer;
 let activeDrain = Promise.resolve();
+let consecutivePublishFailures = 0;
 // CI-only controlled fault injection, never enabled in deployed environments.
 let testFailures = process.env.CI === 'true'
   ? Math.max(0, Math.min(10, Number.parseInt(process.env.SANDBOX_CI_PUBLISH_FAILURES ?? '0', 10) || 0))
@@ -88,10 +90,14 @@ async function drain() {
           `, [ids]);
         }
         await worker.query('COMMIT');
+        // Keep retry metadata durable before opening the circuit.
+        const circuit = nextBrokerCircuit(consecutivePublishFailures, !failed);
+        consecutivePublishFailures = circuit.consecutiveFailures;
         // Any due rows left are retried; deferred rows wait for the next scan.
         wakeAgain = !failed;
-        if (failed && !redis.isReady) {
-          console.error('Redis connection unavailable; relay requires supervisor restart.');
+        if (failed && (circuit.open || !redis.isReady)) {
+          console.error('SANDBOX_BROKER_CIRCUIT_OPEN', consecutivePublishFailures);
+          // Schedule after the current transaction/drain to avoid self-await.
           setImmediate(() => { void close(1); });
         }
       } catch (error) {

@@ -118,9 +118,15 @@ jobs:
         run: npm run db:deploy
       - name: Build Next.js for Redis test
         run: npm run build
+      - name: Check Redis/PostgreSQL sandbox infrastructure prerequisites
+        run: node scripts/sandbox-infra-preflight.mjs
       - name: Verify PostgreSQL bridge, Redis PubSub, SSE reconnect and capacity
         run: node scripts/redis-bridge-smoke.mjs
       - name: Verify durable outbox, rollback isolation and broker recovery
         run: node scripts/outbox-recovery-smoke.mjs
       - name: Verify retry, dead-letter, retention and concurrent-worker load
         run: node scripts/outbox-retry-smoke.mjs
+      - name: Verify circuit breaker trip and durable restart recovery
+        run: node scripts/broker-circuit-smoke.mjs
+      - name: Benchmark 240 sandbox writes with four workers and p50/p95
+        run: node scripts/outbox-benchmark-smoke.mjs

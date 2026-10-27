@@ -181,3 +181,9 @@
 .sandbox-outbox-confirm label{display:grid;gap:8px;font-size:12px;font-weight:800}
 .sandbox-outbox-confirm input{width:min(100%,320px);background:#0a1a10;color:#f6fdf3;border:1px solid #658565;border-radius:10px;padding:11px}
 .sandbox-outbox-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+/* Sprint 16 — sampled broker latency and throughput */
+.ops-performance{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ops-performance span{display:grid;gap:6px;border:1px solid #49634a;background:#192e20;border-radius:11px;padding:12px;font-size:12px;color:#bdd1bc}
+.ops-performance strong{font-size:23px;color:#ecf8e8}
+@media(max-width:650px){.ops-performance{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.ops-performance strong{font-size:18px}}

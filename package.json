@@ -22,7 +22,9 @@
     "typecheck": "npm run db:generate && turbo typecheck",
     "test": "turbo test",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "sandbox:bridge": "node scripts/sandbox-redis-bridge.mjs"
+    "sandbox:bridge": "node scripts/sandbox-redis-bridge.mjs",
+    "sandbox:benchmark": "node scripts/outbox-benchmark-smoke.mjs",
+    "sandbox:circuit-test": "node scripts/broker-circuit-smoke.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.0",
