@@ -197,7 +197,70 @@ try {
     body: JSON.stringify({ id: own.application.id, decision: 'APPROVED' }),
   });
   assert.equal(selfApproval.status, 409, 'administrators must not review their own applications');
-  console.log('PASS: PostgreSQL auth, partner onboarding, admin review access, atomic decisions, audit and self-review guard.');
+
+  // Sandbox is admin-only, completely separate from real rides and offers.
+  const sandboxPath = '/api/admin/sandbox-rides';
+  const sandboxCall = (cookie, data, extraHeaders = {}) => request(sandboxPath, {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json', ...extraHeaders },
+    body: JSON.stringify(data),
+  });
+  const sandboxAnonymous = await request(sandboxPath);
+  assert.equal(sandboxAnonymous.status, 401, 'anonymous cannot inspect simulated rides');
+  const sandboxCustomer = await request(sandboxPath, { headers: { Cookie: cookies, Origin: origin } });
+  assert.equal(sandboxCustomer.status, 403, 'customers cannot access sandbox');
+  const crossOrigin = await sandboxCall(adminCookie, { action: 'seed' }, { Origin: 'https://forged.invalid' });
+  assert.equal(crossOrigin.status, 403, 'admin sandbox mutation requires matching Origin');
+  assert.equal((await sandboxCall(adminCookie, { action: 'reset' })).status, 200);
+  const seeded = await sandboxCall(adminCookie, { action: 'seed' });
+  assert.equal(seeded.status, 200);
+  const createdRide = await sandboxCall(adminCookie, { action: 'create', origin: 'boqueirao', destination: 'ocian' });
+  assert.equal(createdRide.status, 200);
+  const rideId = (await createdRide.json()).result.id;
+  const offerResponse = await sandboxCall(adminCookie, { action: 'offer', rideId });
+  assert.equal(offerResponse.status, 200);
+  const offered = (await offerResponse.json()).result;
+  assert.equal(offered.offers.length, 2, 'each ride should get two independent fictitious offers');
+
+  const [first, second] = await Promise.all(offered.offers.map(o =>
+    sandboxCall(adminCookie, { action: 'accept', offerId: o.id })
+  ));
+  assert.deepEqual([first.status, second.status].sort((a, b) => a - b), [200, 409],
+    'two simultaneous accepts must produce exactly one winner');
+  const ledger = await pool.query('SELECT "status", "acceptedDriverId" FROM "SandboxRide" WHERE "id" = $1', [rideId]);
+  assert.equal(ledger.rows[0].status, 'ACCEPTED');
+  assert.ok(ledger.rows[0].acceptedDriverId);
+  const statuses = await pool.query('SELECT "status" FROM "SandboxRideOffer" WHERE "rideId" = $1', [rideId]);
+  assert.deepEqual(statuses.rows.map(row => row.status).sort(), ['ACCEPTED', 'DECLINED']);
+  const busyDriver = await pool.query('SELECT "busy" FROM "SandboxDriver" WHERE "id" = $1', [ledger.rows[0].acceptedDriverId]);
+  assert.equal(busyDriver.rows[0].busy, true, 'winning driver reserved exactly once');
+  assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 200);
+  assert.equal((await sandboxCall(adminCookie, { action: 'complete', rideId })).status, 409);
+  const released = await pool.query('SELECT "busy" FROM "SandboxDriver" WHERE "id" = $1', [ledger.rows[0].acceptedDriverId]);
+  assert.equal(released.rows[0].busy, false, 'completing the demo ride releases the simulated driver');
+
+  const newRide = await sandboxCall(adminCookie, { action: 'create', origin: 'boqueirao', destination: 'guilhermina' });
+  assert.equal(newRide.status, 200);
+  const expiredRideId = (await newRide.json()).result.id;
+  const newOffers = await sandboxCall(adminCookie, { action: 'offer', rideId: expiredRideId });
+  assert.equal(newOffers.status, 200);
+  const staleOffers = (await newOffers.json()).result.offers;
+  const expiry = await sandboxCall(adminCookie, { action: 'expire', rideId: expiredRideId, advanceSeconds: 45 });
+  assert.equal(expiry.status, 200);
+  const expiredRecord = (await expiry.json()).result;
+  assert.equal(expiredRecord.status, 'EXPIRED');
+  assert.ok(expiredRecord.offers.every(o => o.status === 'EXPIRED'));
+  assert.equal((await sandboxCall(adminCookie, { action: 'accept', offerId: staleOffers[0].id })).status, 409,
+    'expired offers must not be accepted');
+
+  // A fictitious ride never inserts a real passenger Ride or dispatches drivers.
+  const productionRides = await pool.query('SELECT COUNT(*)::int AS count FROM "Ride"');
+  assert.equal(productionRides.rows[0].count, 0);
+  const sandboxPage = await request('/admin/sandbox-rides', { headers: { Cookie: adminCookie, Origin: origin } });
+  assert.equal(sandboxPage.status, 200);
+  assert.match(await sandboxPage.text(), /Corridas simuladas com ofertas/);
+
+  console.log('PASS: auth/partner admin review plus isolated sandbox offers, concurrent acceptance, expiry and driver release.');
 } catch (error) {
   console.error(error);
   console.error('Web server logs:', logs.slice(-7000));
