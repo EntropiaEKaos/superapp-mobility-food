@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export default function DispatchDemoPage() {
   // The addresses below are fictional points for a static engineering demonstration.
-  const nowMs = Date.now();
+  const nowMs = 1_800_000_000_000; // fixed clock: deterministic fixture, never live GPS
   const pickup = { lat: -24.0057, lng: -46.4126 };
   const drivers: DemoDriver[] = [
     { id: 'sim-a', label: 'Carro Alpha (fictício)', point: { lat: -24.0067, lng: -46.4140 }, online: true, available: true, approved: true, lastSeenAtMs: nowMs - 3000 },
