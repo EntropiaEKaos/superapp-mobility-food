@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createClient, type RedisClientType } from 'redis';
+import { createClient } from 'redis';
 
 /** Redis mode is experimental and explicitly opt-in. No payment/real dispatch. */
 export const REDIS_SANDBOX_CHANNEL = 'superapp:sandbox:changed:v1';
