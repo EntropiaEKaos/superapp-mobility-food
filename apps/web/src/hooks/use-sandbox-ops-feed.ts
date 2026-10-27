@@ -73,7 +73,7 @@ export function useSandboxOpsFeed<T>({
       }
     }
 
-    function useFallback() {
+    function activatePollingFallback() {
       stopStream();
       setMode('polling');
       retryPolling(0);
@@ -107,11 +107,11 @@ export function useSandboxOpsFeed<T>({
           setMode('error');
         }
       });
-      current.addEventListener('unavailable', () => useFallback());
+      current.addEventListener('unavailable', () => activatePollingFallback());
       current.onerror = () => {
         if (closed || stream !== current) return;
         errors += 1;
-        if (errors >= 2) useFallback();
+        if (errors >= 2) activatePollingFallback();
         else setMode('connecting'); // EventSource reconnects by itself.
       };
     }
