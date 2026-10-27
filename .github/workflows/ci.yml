@@ -138,3 +138,54 @@ jobs:
         run: node scripts/broker-circuit-smoke.mjs
       - name: Benchmark 240 sandbox writes with four workers and p50/p95
         run: node scripts/outbox-benchmark-smoke.mjs
+
+  homologation-e2e:
+    name: Homologation — customer/admin end-to-end + QA report
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: superapp_ci
+          POSTGRES_PASSWORD: superapp_ci_password
+          POSTGRES_DB: superapp_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U superapp_ci -d superapp_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CI: 'true'
+      DATABASE_URL: postgresql://superapp_ci:superapp_ci_password@127.0.0.1:5432/superapp_ci?schema=public
+      BETTER_AUTH_SECRET: local-ci-test-secret-only-32-chars-123456
+      BETTER_AUTH_URL: http://127.0.0.1:3191
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3191
+      ENABLE_SANDBOX_DISPATCH: 'true'
+      SANDBOX_EVENT_TRANSPORT: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Apply versioned migrations
+        run: npm run db:deploy
+      - name: Build web app
+        run: npm run build
+      - name: Run isolated customer/admin homologation journeys
+        run: node scripts/homologation-journey.mjs
+      - name: Attach QA report (including failures)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint18-homologation-qa
+          path: artifacts/homologation/
+          if-no-files-found: warn
+          retention-days: 14
