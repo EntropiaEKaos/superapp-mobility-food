@@ -330,6 +330,7 @@ model SandboxRideEvent {
 enum SandboxOutboxStatus {
   PENDING
   PUBLISHED
+  DEAD
 }
 
 model SandboxEventOutbox {
@@ -338,9 +339,12 @@ model SandboxEventOutbox {
   sourceTable String
   operation   String
   attempts    Int                @default(0)
+  nextAttemptAt DateTime         @default(now())
+  lastErrorCode String?
   createdAt   DateTime           @default(now())
   publishedAt DateTime?
 
   @@index([status, id])
+  @@index([status, nextAttemptAt, id])
   @@index([createdAt])
 }
