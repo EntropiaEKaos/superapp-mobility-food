@@ -50,14 +50,15 @@ async function readOutboxReadiness() {
   return rows[0];
 }
 async function redisAvailable(): Promise<boolean> {
-  const client = makeRedisClient();
+  let client: ReturnType<typeof makeRedisClient> | undefined;
   try {
+    client = makeRedisClient();
     await client.connect();
     return await client.ping() === 'PONG';
   } catch {
     return false;
   } finally {
-    client.destroy();
+    client?.destroy();
   }
 }
 
