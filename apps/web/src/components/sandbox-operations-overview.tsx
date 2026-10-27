@@ -3,6 +3,8 @@ import { Activity, AlertTriangle, CarFront, CheckCircle2, Clock3, Gauge, Refresh
 export type SandboxOpsTelemetry = {
   generatedAt: string;
   recentLimit: number;
+  deadSamples: Array<{ id: string; attempts: number; lastErrorCode: string | null; createdAt: string }>;
+  workerHealth: { activeConnections: number; averagePublishLagSeconds: number | null; sampleSize: number };
   outboxHealth: { pending: number; published: number; dead: number; retrying: number; oldestDeadAgeSeconds: number | null; oldestPendingAgeSeconds: number | null; deliveryGuarantee: 'at-least-once-to-broker' };
   streamHealth: { activeConnections: number; capacity: number; availableSlots: number; utilizationPercent: number; transport: 'postgres' | 'redis' };
   metrics: {
@@ -116,6 +118,10 @@ export function SandboxOperationsOverview({
         <strong><Activity size={18}/> Eventos duráveis · Outbox</strong>
         <span>Entrega ao broker com possível repetição</span>
       </div>
+      <p>Workers ativos no PostgreSQL: <strong>{snapshot.workerHealth.activeConnections}</strong> ·
+        Atraso médio de publicação: <strong>{snapshot.workerHealth.averagePublishLagSeconds === null
+          ? 'Sem amostra' : `${snapshot.workerHealth.averagePublishLagSeconds}s`}</strong>
+        · Amostra de {snapshot.workerHealth.sampleSize} avisos publicados.</p>
       <div className="ops-outbox-stats">
         <span>Pendentes <strong>{snapshot.outboxHealth.pending}</strong></span>
         <span>Publicados <strong>{snapshot.outboxHealth.published}</strong></span>
