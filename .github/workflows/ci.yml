@@ -68,6 +68,10 @@ jobs:
         run: npm exec -w @superapp/database -- prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
       - name: Build web app for integration test
         run: npm run build
+      - name: Verify token-guarded monitoring, alerts and degraded database
+        env:
+          SANDBOX_MONITOR_TOKEN: local-ci-monitor-only-0123456789-ABCDEFG
+        run: node scripts/sandbox-monitor-smoke.mjs
       - name: Verify sign-up, sessions, roles and PostgreSQL
         run: node scripts/auth-db-smoke.mjs
 
@@ -120,6 +124,10 @@ jobs:
         run: npm run build
       - name: Check Redis/PostgreSQL sandbox infrastructure prerequisites
         run: node scripts/sandbox-infra-preflight.mjs
+      - name: Verify monitoring with Redis worker and webhook alert
+        env:
+          SANDBOX_MONITOR_TOKEN: local-ci-monitor-only-0123456789-ABCDEFG
+        run: node scripts/sandbox-monitor-smoke.mjs
       - name: Verify PostgreSQL bridge, Redis PubSub, SSE reconnect and capacity
         run: node scripts/redis-bridge-smoke.mjs
       - name: Verify durable outbox, rollback isolation and broker recovery
