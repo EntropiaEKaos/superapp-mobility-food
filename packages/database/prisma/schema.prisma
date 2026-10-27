@@ -217,4 +217,5 @@ model PartnerApplication {
 
   @@unique([userId, kind])
   @@index([status, createdAt])
+  @@index([reviewerId])
 }
