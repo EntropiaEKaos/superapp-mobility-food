@@ -124,3 +124,7 @@ jobs:
         run: node scripts/outbox-recovery-smoke.mjs
       - name: Verify retry, dead-letter, retention and concurrent-worker load
         run: node scripts/outbox-retry-smoke.mjs
+      - name: Verify circuit breaker trip and durable restart recovery
+        run: node scripts/broker-circuit-smoke.mjs
+      - name: Benchmark 240 sandbox writes with four workers and p50/p95
+        run: node scripts/outbox-benchmark-smoke.mjs
