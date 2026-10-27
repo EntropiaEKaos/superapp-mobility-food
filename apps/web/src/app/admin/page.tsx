@@ -39,6 +39,10 @@ export default async function AdminPage() {
       <h1>Análise de parceiros</h1>
       <p>Revise as solicitações dos motoristas, entregadores e estabelecimentos. Cada decisão é registrada no banco com o identificador do administrador.</p>
     </div>
+    <div className="partner-cta">
+      <Link href="/admin/sandbox-rides" className="btn secondary">Abrir laboratório de corridas simuladas</Link>
+      <p>Ambiente separado, desabilitado por padrão e sem motoristas reais.</p>
+    </div>
     <PartnerReviewConsole initial={initial}/>
   </main>;
 }
