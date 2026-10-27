@@ -19,7 +19,8 @@
     "@superapp/rides": "*",
     "@superapp/food": "*",
     "lucide-react": "^0.468.0",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "redis": "^5.0.0"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
