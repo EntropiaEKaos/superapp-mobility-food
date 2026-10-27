@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, CarFront, CheckCircle2, Clock3, Gauge, Refresh
 export type SandboxOpsTelemetry = {
   generatedAt: string;
   recentLimit: number;
-  streamHealth: { activeConnections: number; capacity: number; availableSlots: number; utilizationPercent: number };
+  streamHealth: { activeConnections: number; capacity: number; availableSlots: number; utilizationPercent: number; transport: 'postgres' | 'redis' };
   metrics: {
     totalRides: number;
     activeRides: number;
@@ -100,7 +100,7 @@ export function SandboxOperationsOverview({
     <section className="ops-stream-health" aria-label="Saúde das transmissões">
       <div className="ops-stream-health-heading">
         <strong><Activity size={18}/> Conexões em tempo real</strong>
-        <span>{snapshot.streamHealth.activeConnections} de {snapshot.streamHealth.capacity} canais SSE ativos</span>
+        <span>{snapshot.streamHealth.activeConnections} de {snapshot.streamHealth.capacity} canais SSE · {snapshot.streamHealth.transport === 'redis' ? 'Redis' : 'PostgreSQL'}</span>
       </div>
       <div className="ops-stream-meter" role="progressbar"
         aria-label="Utilização de conexões SSE" aria-valuenow={snapshot.streamHealth.activeConnections}
