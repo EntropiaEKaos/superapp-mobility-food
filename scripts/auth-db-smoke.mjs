@@ -456,8 +456,8 @@ try {
   assert.match(operationsHtml, /Visão geral da operação/);
   assert.match(operationsHtml, /Diagnóstico de integridade/);
   assert.match(operationsHtml, /Eventos recentes/);
-  assert.match(operationsHtml, /Atualização automática ativa/, 'live status should render');
-  assert.match(operationsHtml, /Leitura a cada 6 s/, 'refresh cadence must be clearly labeled');
+  assert.match(operationsHtml, /Conectando ao fluxo de eventos/, 'SSE connection state should render');
+  assert.match(operationsHtml, /Modo alternativo: consulta periódica|Fallback GET a cada 6 s/, 'fallback information must be visible');
 
 
 
