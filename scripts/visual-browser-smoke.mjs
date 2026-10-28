@@ -119,7 +119,7 @@ async function checkPublicPages(context, device) {
       const subtotal = page.locator('.cart-total strong');
       assert.equal(await remove.isDisabled(), true, 'cannot remove below zero');
       const unitPriceText = await firstItem.locator('.menu-details strong').innerText();
-      const parseBrl = text => Math.round(Number(text.replace(/[^\\d,]/g, '').replace(',', '.')) * 100);
+      const parseBrl = text => Math.round(Number(text.replace(/[^\d,]/g, '').replace(',', '.')) * 100);
       const unitCents = parseBrl(unitPriceText);
       assert.ok(unitCents > 0, 'valid positive menu price');
       await add.click();
