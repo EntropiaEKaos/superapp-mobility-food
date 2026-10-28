@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Minus, Plus, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, ShieldCheck, Trash2, ArrowRight } from 'lucide-react';
 import type { DemoMenuItem } from '@superapp/food';
 import { calculateCart } from '@superapp/food';
 import { brl } from '@/lib/format';
@@ -19,6 +19,8 @@ export function DemoCart({ restaurantName, menu }: Props) {
   })));
   const totalItems = selected.reduce((sum, item) => sum + quantities[item.id], 0);
 
+  function clearCart() { setQuantities({}); }
+
   function changeQuantity(id: string, delta: number) {
     setQuantities(previous => ({
       ...previous,
@@ -28,7 +30,7 @@ export function DemoCart({ restaurantName, menu }: Props) {
 
   return (
     <div className="menu-layout">
-      <div className="menu-list">
+      <div className="menu-list" aria-label="Itens do cardápio">
         {menu.map(item => {
           const quantity = quantities[item.id] ?? 0;
           return (
@@ -38,7 +40,7 @@ export function DemoCart({ restaurantName, menu }: Props) {
                 <h3>{item.name}</h3>
                 <p>{item.description}</p>
                 <strong>{brl(item.priceCents)}</strong>
-                <div className="quantity-controls" aria-label={`Quantidade de ${item.name}`}>
+                <div className="quantity-controls" role="group" aria-label={`Quantidade de ${item.name}`}>
                   <button type="button" onClick={() => changeQuantity(item.id, -1)} disabled={quantity === 0} aria-label={`Remover uma unidade de ${item.name}`}><Minus size={16}/></button>
                   <span aria-live="polite">{quantity}</span>
                   <button type="button" onClick={() => changeQuantity(item.id, 1)} disabled={quantity >= 20} aria-label={`Adicionar uma unidade de ${item.name}`}><Plus size={16}/></button>
@@ -49,7 +51,7 @@ export function DemoCart({ restaurantName, menu }: Props) {
         })}
       </div>
       <aside className="demo-cart" aria-label="Carrinho demonstrativo">
-        <div className="cart-heading"><ShoppingBag size={22}/><h2>Meu carrinho</h2></div>
+        <div className="cart-heading"><ShoppingBag size={22}/><h2>Meu carrinho</h2>{totalItems > 0 && <span className="sprint21-cart-badge" aria-label={`${totalItems} itens no carrinho`}>{totalItems}</span>}</div>
         <p className="cart-subtitle">{restaurantName} • somente demonstração</p>
         {selected.length === 0 ? (
           <p className="cart-empty">Seu carrinho está vazio. Adicione produtos para simular um pedido.</p>
@@ -63,7 +65,7 @@ export function DemoCart({ restaurantName, menu }: Props) {
             ))}
           </ul>
         )}
-        <div className="cart-total"><span>Subtotal ({totalItems} itens)</span><strong>{brl(totalCents)}</strong></div>
+        <div className="cart-total" aria-live="polite"><span>Subtotal ({totalItems} itens)</span><strong>{brl(totalCents)}</strong></div>{totalItems > 0 && <div className="sprint21-cart-actions"><button className="sprint21-clear" type="button" onClick={clearCart}><Trash2 size={16}/> Limpar carrinho</button><div className="sprint21-fake-checkout" aria-label="Finalização indisponível nesta demonstração"><span>Finalização indisponível</span><ArrowRight size={17}/></div></div>}
         <div className="cart-note"><ShieldCheck size={17}/><span>Valores simulados. Nenhum pedido é enviado, e nenhum pagamento é realizado.</span></div>
       </aside>
     </div>
