@@ -66,7 +66,7 @@ async function checkPublicPages(context, device) {
   try {
     await caseRun(device + ' — landing and navigation', async () => {
       await page.goto(base);
-      await page.getByRole('heading', { level: 1, name: /Sua cidade/i }).waitFor();
+      await page.getByRole('heading', { level: 1, name: /Mais cidade/i }).waitFor();
       await assertNoHorizontalOverflow(page, device + ' home');
       await shot(page, prefix + 'home');
       if (device === 'mobile') {
