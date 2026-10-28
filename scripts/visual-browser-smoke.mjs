@@ -66,9 +66,19 @@ async function checkPublicPages(context, device) {
   try {
     await caseRun(device + ' — landing and navigation', async () => {
       await page.goto(base);
-      await page.getByRole('heading', { level: 1, name: /Sua cidade/i }).waitFor();
+      await page.getByRole('heading', { level: 1, name: /Mais cidade/i }).waitFor();
       await assertNoHorizontalOverflow(page, device + ' home');
       await shot(page, prefix + 'home');
+      if (device === 'mobile') {
+        const dock = page.getByRole('navigation', { name: 'Navegação rápida' });
+        assert.equal(await dock.isVisible(), true, 'mobile navigation dock visible');
+        for (const label of ['Corridas', 'Delivery', 'Parceiros', 'Conta']) {
+          assert.equal(await dock.getByRole('link', { name: label }).isVisible(), true);
+        }
+        const dockRect = await dock.boundingBox();
+        const viewport = page.viewportSize();
+        assert.ok(dockRect && viewport && dockRect.y + dockRect.height >= viewport.height - 3);
+      }
       await safeLink(page, /Simular corrida/i, '/rides');
     });
     await caseRun(device + ' — ride estimate and invalid same destination', async () => {
@@ -113,7 +123,7 @@ async function checkPublicPages(context, device) {
         href: document.activeElement?.getAttribute('href'),
       }));
       assert.equal(first.tag, 'A');
-      assert.ok(first.href, 'first focus must be actionable link');
+      assert.equal(first.href, '#conteudo-principal', 'skip link must be first keyboard target');
       // Mobile nav hides different links: follow focus until a real /rides link
       // instead of assuming a fixed tab index across responsive layouts.
       let focusedRide = false;

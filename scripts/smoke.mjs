@@ -42,7 +42,7 @@ try {
   const home = await response('/');
   assert.equal(home.status, 200, 'home must render');
   const html = await home.text();
-  assert.match(html, /Sua cidade/);
+  assert.match(html, /Mais cidade/);
 
   const restaurant = await response('/food/demo-bistro');
   assert.equal(restaurant.status, 200, 'restaurant menu must render');
