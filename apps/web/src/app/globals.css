@@ -316,3 +316,18 @@ body{background:#080e0c;background-image:radial-gradient(ellipse 80% 60% at 92% 
 .sprint21-fake-checkout{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#40513b;border-radius:12px;padding:15px;color:#e0ecda;font-size:13px;font-weight:800;opacity:.85}
 @media(max-width:950px){.sprint21-ride-layout{grid-template-columns:1fr}.sprint21-map{min-height:310px}.sprint21-section-header{align-items:flex-start}}
 @media(max-width:650px){.sprint21-heading h1{letter-spacing:-2px}.sprint21-ride-layout .estimator{padding:20px}.sprint21-section-header{flex-direction:column;margin:25px 0 20px}.sprint21-count{align-self:flex-start}.sprint21-restaurants .restaurant-cover{height:175px}.sprint21-restaurant-hero{padding:18px;gap:16px}.sprint21-map{min-height:280px}}
+
+
+/* Sprint 22 - restaurant discovery */
+.sprint22-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,230px);gap:14px;margin:23px 0}
+.sprint22-controls label{display:grid;gap:9px;font-weight:800;font-size:12px;color:#d3e6d0}
+.sprint22-controls input,.sprint22-controls select{width:100%;background:#14271a;border:1px solid #567459;color:#f4faf2;border-radius:12px;min-height:50px;padding:12px 14px}
+.sprint22-chips{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:18px}
+.sprint22-chips button{background:#1b3020;color:#cfe1ce;border:1px solid #527458;border-radius:30px;padding:10px 17px;font-size:13px;font-weight:800}
+.sprint22-chips button[aria-pressed="true"]{background:var(--lime);color:#14220f;border-color:var(--lime)}
+.sprint22-summary{display:flex;align-items:center;gap:14px;margin:0 0 23px;color:#cfdfc8;font-size:13px}
+.sprint22-summary button,.sprint22-empty button{color:var(--lime);border:1px solid #547958;padding:9px 14px;border-radius:11px;background:#223a27;font-weight:800}
+.sprint22-empty{border:1px dashed #567258;background:#17281d;border-radius:20px;text-align:center;padding:45px 20px;display:grid;justify-items:center;gap:12px}
+.sprint22-empty h3,.sprint22-empty p{margin:0}
+.sprint22-empty p{color:#afc3af}
+@media(max-width:650px){.sprint22-controls{grid-template-columns:1fr}.sprint22-summary{flex-wrap:wrap}}
