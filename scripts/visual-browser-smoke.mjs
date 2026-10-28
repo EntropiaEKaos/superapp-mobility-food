@@ -115,7 +115,15 @@ async function checkPublicPages(context, device) {
       await page.getByText(/Nenhum pedido é enviado ou cobrado/).waitFor();
       await page.getByRole('button', { name: /^Adicionar uma unidade de / }).first().click();
       assert.equal(await page.locator('.sprint21-cart-badge').innerText(), '1');
+      const note = page.locator('.menu-item').first().getByRole('textbox', { name: /Observações para/ });
+      await note.fill('Sem cebola');
+      await page.getByRole('button', { name: /Revisar pedido demo/i }).click();
+      const review = page.getByRole('region', { name: /Resumo do pedido demonstrativo/i });
+      assert.equal(await review.isVisible(), true);
+      await review.getByText(/Sem cebola/).waitFor();
+      await review.getByText(/Total ilustrativo: R\\$/).waitFor();
       await page.getByRole('button', { name: /Limpar carrinho/i }).click();
+      assert.equal(await review.count(), 0, 'clear closes review');
       await page.getByText(/Seu carrinho está vazio/).waitFor();
       await assertNoHorizontalOverflow(page, device + ' menu');
       await shot(page, prefix + 'menu');
