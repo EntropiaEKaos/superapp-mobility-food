@@ -98,6 +98,16 @@ async function checkPublicPages(context, device) {
     await caseRun(device + ' — restaurant discovery and demo cart', async () => {
       await page.goto(base + '/food');
       await page.getByRole('heading', { name: /Peça seu próximo favorito/i }).waitFor();
+      const finder = page.getByRole('searchbox', { name: /Buscar restaurante ou prato/i });
+      await finder.fill('pizza');
+      await page.getByText('1 restaurante encontrado').waitFor();
+      await finder.fill('inexistente-xyz');
+      await page.getByRole('heading', { name: /Nenhum restaurante encontrado/i }).waitFor();
+      await page.getByRole('button', { name: /Ver todos os restaurantes/i }).click();
+      await page.getByRole('button', { name: 'Lanches' }).click();
+      await page.getByText('1 restaurante encontrado').waitFor();
+      await page.getByRole('button', { name: /Limpar filtros/i }).click();
+      await page.getByText('3 restaurantes encontrados').waitFor();
       await assertNoHorizontalOverflow(page, device + ' food');
       await shot(page, prefix + 'food');
       await page.locator('.restaurant-grid a').first().click();
