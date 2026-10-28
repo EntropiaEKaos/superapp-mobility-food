@@ -103,6 +103,10 @@ async function checkPublicPages(context, device) {
       await page.locator('.restaurant-grid a').first().click();
       await page.getByRole('heading', { name: /Cardápio/ }).waitFor();
       await page.getByText(/Nenhum pedido é enviado ou cobrado/).waitFor();
+      await page.getByRole('button', { name: /^Adicionar uma unidade de / }).first().click();
+      assert.equal(await page.locator('.sprint21-cart-badge').innerText(), '1');
+      await page.getByRole('button', { name: /Limpar carrinho/i }).click();
+      await page.getByText(/Seu carrinho está vazio/).waitFor();
       await assertNoHorizontalOverflow(page, device + ' menu');
       await shot(page, prefix + 'menu');
     });
