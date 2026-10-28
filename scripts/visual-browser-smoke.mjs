@@ -86,6 +86,8 @@ async function checkPublicPages(context, device) {
       await page.locator('#destination').selectOption('0');
       assert.equal(await page.getByRole('button', { name: /Calcular estimativa/i }).isDisabled(), true);
       await page.locator('#destination').selectOption('2');
+      await page.getByRole('button', { name: /Inverter origem e destino/i }).click();
+      await page.getByRole('button', { name: /Inverter origem e destino/i }).click();
       await page.getByRole('button', { name: /Conforto/i }).click();
       await page.getByRole('button', { name: /Calcular estimativa/i }).click();
       await page.getByText(/ESTIMATIVA ILUSTRATIVA/).waitFor();
